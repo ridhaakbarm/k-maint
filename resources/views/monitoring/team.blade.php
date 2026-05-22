@@ -1,0 +1,728 @@
+@extends('layouts.app')
+
+@section('content')
+<div class="container-fluid py-4">
+    {{-- HEADER --}}
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="fw-bold mb-1"><i class="fas fa-users-cog me-2 text-primary"></i>Monitoring Aktivitas Tim Teknisi</h4>
+            <small class="text-muted">Pantau produktivitas dan aktivitas tim secara detail</small>
+        </div>
+        <div class="d-flex gap-2">
+            {{-- Export Button --}}
+            <a href="{{ route('monitoring.team.export', [
+    'period' => $period,
+    'role_type' => request('role_type', 'mtc'),
+    'technician' => $technicianId,
+    'date_from' => $dateFrom,
+    'date_to' => $dateTo
+]) }}" class="btn btn-success">
+    <i class="fas fa-file-excel me-1"></i> Export Excel
+</a>
+            <a href="{{ route('dashboard') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i> Kembali ke Dashboard
+            </a>
+        </div>
+    </div>
+
+    {{-- FILTER SECTION - REDESIGNED --}}
+    <div class="card shadow-sm mb-4 border-primary">
+        <div class="card-header bg-primary text-white py-2">
+            <div class="d-flex justify-content-between align-items-center">
+                <span class="fw-bold"><i class="fas fa-filter me-2"></i>Filter Monitoring</span>
+                <small class="opacity-75">Atur tampilan data sesuai kebutuhan</small>
+            </div>
+        </div>
+        <div class="card-body">
+            <form method="GET" action="{{ route('monitoring.team') }}" id="filterForm">
+    {{-- ROW 1: Periode, Kategori Personel & Teknisi --}}
+    <div class="row g-3 mb-3">
+        {{-- Periode --}}
+        <div class="col-md-2">
+            <label class="form-label fw-bold small text-primary">
+                <i class="fas fa-calendar-alt me-1"></i>Periode
+            </label>
+            <select name="period" id="periodSelect" class="form-select" onchange="this.form.submit()">
+                <option value="daily" {{ $period === 'daily' ? 'selected' : '' }}> Harian</option>
+                <option value="weekly" {{ $period === 'weekly' ? 'selected' : '' }}> Mingguan</option>
+                <option value="monthly" {{ $period === 'monthly' ? 'selected' : '' }}> Bulanan</option>
+                <option value="custom" {{ $period === 'custom' ? 'selected' : '' }}> Custom Range</option>
+            </select>
+        </div>
+
+        {{-- TAMBAHAN: Kategori Personel --}}
+        <div class="col-md-3">
+            <label class="form-label fw-bold small text-primary">
+                <i class="fas fa-id-badge me-1"></i>Kategori Staff/Teknisi
+            </label>
+            <select name="role_type" class="form-select" onchange="this.form.submit()">
+                <option value="mtc" {{ request('role_type', 'mtc') === 'mtc' ? 'selected' : '' }}> Khusus Teknisi (MTC)</option>
+                <option value="management" {{ request('role_type') === 'management' ? 'selected' : '' }}>Staff MTC / Engineering</option>
+                <option value="all" {{ request('role_type') === 'all' ? 'selected' : '' }}>Semua Personel</option>
+            </select>
+        </div>
+
+        {{-- Teknisi --}}
+        <div class="col-md-3">
+            <label class="form-label fw-bold small text-primary">
+                <i class="fas fa-user-cog me-1"></i>Nama Teknisi/Staff
+            </label>
+            <select name="technician" class="form-select" onchange="this.form.submit()">
+                <option value="all" {{ $technicianId === 'all' ? 'selected' : '' }}>Semua Personel</option>
+                @foreach($technicians as $tech)
+                <option value="{{ $tech->id }}" {{ (string)$technicianId === (string)$tech->id ? 'selected' : '' }}>
+                    {{ $tech->name }}
+                </option>
+                @endforeach
+            </select>
+        </div>
+
+        {{-- Tanggal Range --}}
+        <div class="col-md-4" id="dateRangeContainer">
+            <label class="form-label fw-bold small text-primary">
+                <i class="fas fa-calendar me-1"></i>Range Tanggal
+            </label>
+            <div class="input-group">
+                <input type="date" name="date_from" class="form-control" value="{{ $dateFrom }}">
+                <span class="input-group-text">s/d</span>
+                <input type="date" name="date_to" class="form-control" value="{{ $dateTo }}">
+            </div>
+            @if($period === 'weekly' || $period === 'monthly')
+            <small class="text-muted d-block mt-1">
+                <i class="fas fa-info-circle me-1"></i>
+                @if($period === 'weekly')
+                    Minggu ini: {{ Carbon\Carbon::parse($dateFrom)->format('d M') }} - {{ Carbon\Carbon::parse($dateTo)->format('d M Y') }}
+                @else
+                    Bulan ini: {{ Carbon\Carbon::parse($dateFrom)->format('F Y') }}
+                @endif
+            </small>
+            @endif
+        </div>
+    </div>
+
+                {{-- ROW 2: Action Buttons --}}
+                <div class="row g-3">
+                    <div class="col-12 d-flex gap-2 align-items-center">
+                        <button type="submit" class="btn btn-primary px-4">
+                            <i class="fas fa-search me-1"></i> Terapkan Filter
+                        </button>
+                        <a href="{{ route('monitoring.team') }}" class="btn btn-outline-danger px-4">
+                            <i class="fas fa-undo me-1"></i> Reset Filter
+                        </a>
+                        @if($technicianId !== 'all' || $period !== 'daily')
+                        <span class="badge bg-info text-dark ms-auto">
+                            <i class="fas fa-filter me-1"></i>
+                            {{ $period === 'daily' ? 'Harian' : ($period === 'weekly' ? 'Mingguan' : ($period === 'monthly' ? 'Bulanan' : 'Custom')) }}
+                            @if($technicianId !== 'all')
+                                • {{ $technicians->firstWhere('id', $technicianId)?->name ?? 'Teknisi' }}
+                            @endif
+                        </span>
+                        @endif
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {{-- Filter Info Badge (Floating) --}}
+    <style>
+        .filter-active-indicator {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+    </style>
+
+    {{-- SUMMARY CARDS --}}
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm bg-primary text-white h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-tasks fa-2x mb-2 opacity-50"></i>
+                    <h2 class="fw-bold mb-0">{{ $overallSummary['total_activities'] }}</h2>
+                    <small>Total Aktivitas</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm bg-success text-white h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-clock fa-2x mb-2 opacity-50"></i>
+                    <h2 class="fw-bold mb-0">{{ $overallSummary['total_hours'] }}</h2>
+                    <small>Total Jam Kerja</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm bg-info text-white h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-calendar-check fa-2x mb-2 opacity-50"></i>
+                    <h2 class="fw-bold mb-0">{{ $overallSummary['by_category']['PM'] ?? 0 }} m</h2>
+                    <small>PM Menit</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm bg-danger text-white h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-wrench fa-2x mb-2 opacity-50"></i>
+                    <h2 class="fw-bold mb-0">{{ $overallSummary['by_category']['Breakdown'] ?? 0 }} m</h2>
+                    <small>Breakdown Menit</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- PM PROGRESS SECTION --}}
+    <div class="row g-4 mb-4">
+        {{-- PM PROGRESS BY WEEK --}}
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
+                    <span>
+                        <i class="fas fa-chart-line me-2 text-primary"></i>
+                        Progress PM per Week
+                    </span>
+                    <small class="text-muted">Total Item Checklist</small>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0 small align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-3">Week</th>
+                                    <th class="text-center">Total Item</th>
+                                    <th class="text-center">Selesai</th>
+                                    <th class="text-center">Progres</th>
+                                    <th class="text-center">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse($pmProgressByWeek ?? [] as $progress)
+                                <tr>
+                                    <td class="ps-3">
+                                        <strong>
+                                            Week {{ $progress['week'] }}
+                                            @if($progress['is_current_week'])
+                                                <span class="badge bg-primary ms-1">Current</span>
+                                            @endif
+                                        </strong>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="fw-bold text-dark">{{ $progress['total_items'] }}</span>
+                                        <small class="text-muted d-block">item</small>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="fw-bold text-success">{{ $progress['completed_items'] }}</span>
+                                        @if($progress['in_progress_items'] > 0)
+                                            <small class="text-warning d-block">+{{ $progress['in_progress_items'] }} prog</small>
+                                        @endif
+                                    </td>
+                                    <td class="text-center" style="min-width: 150px;">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="progress flex-grow-1" style="height: 22px;">
+                                                @php
+                                                    $pct = $progress['percentage'];
+                                                    $color = $pct >= 80 ? 'success' : ($pct >= 50 ? 'warning' : 'danger');
+                                                @endphp
+                                                <div class="progress-bar bg-{{ $color }}"
+                                                     style="width: {{ $pct }}%">
+                                                    {{ $pct }}%
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <small class="text-muted">{{ $progress['remaining_items'] }} remaining</small>
+                                    </td>
+                                    <td class="text-center">
+                                        @if($progress['percentage'] >= 100)
+                                            <span class="badge bg-success">
+                                                <i class="fas fa-check-circle me-1"></i>Selesai
+                                            </span>
+                                        @elseif($progress['percentage'] >= 50)
+                                            <span class="badge bg-warning text-dark">
+                                                <i class="fas fa-spinner me-1"></i>Progres
+                                            </span>
+                                        @else
+                                            <span class="badge bg-danger">
+                                                <i class="fas fa-exclamation-circle me-1"></i>Rendah
+                                            </span>
+                                        @endif
+                                    </td>
+                                </tr>
+                                @empty
+                                <tr><td colspan="5" class="text-center py-4 text-muted">Tidak ada data PM</td></tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- PM PROGRESS BY PIC/TECHNICIAN --}}
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
+                    <span>
+                        <i class="fas fa-users-check me-2 text-success"></i>
+                        Progress PM per PIC (Week {{ $currentWeek ?? now()->weekOfYear }})
+                    </span>
+                    <small class="text-muted">Perfomance Teknisi</small>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0 small align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-3">Teknisi</th>
+                                    <th class="text-center">Total Item</th>
+                                    <th class="text-center">Selesai</th>
+                                    <th class="text-center">Progres</th>
+                                    <th class="text-center">Mesin</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse($pmProgressByPic ?? [] as $picProgress)
+                                <tr>
+                                    <td class="ps-3">
+                                        <strong>{{ $picProgress['technician']->name }}</strong>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="fw-bold text-dark">{{ $picProgress['total_items'] }}</span>
+                                        <small class="text-muted d-block">item</small>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="fw-bold text-success">{{ $picProgress['completed_items'] }}</span>
+                                        <small class="text-muted d-block">dari {{ $picProgress['total_items'] }}</small>
+                                    </td>
+                                    <td class="text-center" style="min-width: 150px;">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="progress flex-grow-1" style="height: 22px;">
+                                                @php
+                                                    $pct = $picProgress['percentage'];
+                                                    $color = $pct >= 80 ? 'success' : ($pct >= 50 ? 'warning' : 'danger');
+                                                @endphp
+                                                <div class="progress-bar bg-{{ $color }}"
+                                                     style="width: {{ $pct }}%">
+                                                    {{ $pct }}%
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <small class="text-muted">{{ $picProgress['remaining_items'] }} remaining</small>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-info">{{ $picProgress['total_machines'] }}</span>
+                                        <small class="text-muted d-block">mesin</small>
+                                    </td>
+                                </tr>
+                                @empty
+                                <tr><td colspan="5" class="text-center py-4 text-muted">Belum ada data PM untuk week ini</td></tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        {{-- PRODUCTIVITY CHART --}}
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white fw-bold">
+                    <i class="fas fa-chart-bar me-2 text-primary"></i>Produktivitas per Teknisi (Jam)
+                </div>
+                <div class="card-body d-flex align-items-center justify-content-center">
+                    <canvas id="productivityChart" style="max-height: 250px;"></canvas>
+                </div>
+            </div>
+        </div>
+
+        {{-- TECHNICIAN SUMMARY --}}
+        <div class="col-md-8">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white fw-bold">
+                    <i class="fas fa-user-clock me-2 text-success"></i>Ringkasan Produktivitas Teknisi
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0 small">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-3">Teknisi</th>
+                                    <th class="text-center">Clock In</th>
+                                    <th class="text-center">Clock Out</th>
+                                    <th class="text-center">Aktivitas</th>
+                                    <th class="text-center">PM</th>
+                                    <th class="text-center">Breakdown</th>
+                                    <th class="text-center">Lainnya</th>
+                                    <th class="text-center">Total Jam</th>
+                                    <th class="text-center">Jam Kerja</th>
+                                    <th class="text-center">Produktivitas</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse($technicianSummary as $summary)
+                                <tr>
+                                    <td class="ps-3">
+                                        <strong>{{ $summary['user']->name }}</strong>
+                                        {{-- Show clock info badge if multiple days --}}
+                                        @if($summary['clock_info']->count() > 1)
+                                            <small class="text-muted d-block">{{ $summary['clock_info']->count() }} hari</small>
+                                        @endif
+                                    </td>
+                                    <td class="text-center">
+                                        @if($summary['clock_info']->isNotEmpty())
+                                            @if($summary['clock_info']->count() == 1)
+                                                <span class="small">{{ $summary['clock_info']->first()['clock_in'] }}</span>
+                                            @else
+                                                <span class="small text-muted">Multi</span>
+                                            @endif
+                                        @else
+                                            <span class="text-muted">-</span>
+                                        @endif
+                                    </td>
+                                    <td class="text-center">
+                                        @if($summary['clock_info']->isNotEmpty())
+                                            @if($summary['clock_info']->count() == 1)
+                                                <span class="small">{{ $summary['clock_info']->first()['clock_out'] }}</span>
+                                            @else
+                                                <span class="small text-muted">Multi</span>
+                                            @endif
+                                        @else
+                                            <span class="text-muted">-</span>
+                                        @endif
+                                    </td>
+                                    <td class="text-center">{{ $summary['total_activities'] }}</td>
+                                    <td class="text-center">
+                                        <span class="badge bg-success">{{ $summary['pm_count'] }}</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-danger">{{ $summary['breakdown_count'] }}</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-secondary">{{ $summary['other_count'] }}</span>
+                                    </td>
+                                    <td class="text-center fw-bold">{{ $summary['total_hours'] }} j</td>
+                                    <td class="text-center">
+                                        <span class="small fw-bold {{ $summary['net_work_hours'] >= 8 ? 'text-success' : 'text-warning' }}">
+                                            {{ $summary['net_work_hours'] }} j
+                                        </span>
+                                        @if($summary['total_work_hours'] > 0)
+                                            <small class="text-muted d-block">dari {{ $summary['total_work_hours'] }} j</small>
+                                        @endif
+                                    </td>
+                                    <td class="text-center" style="min-width: 120px;">
+                                        @php
+                                            $pct = $summary['productivity'] ?? 0;
+                                            $color = $pct >= 80 ? 'success' : ($pct >= 50 ? 'warning' : 'danger');
+                                        @endphp
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="progress flex-grow-1" style="height: 20px;">
+                                                <div class="progress-bar bg-{{ $color }}"
+                                                     style="width: {{ $pct }}%"
+                                                     data-bs-toggle="tooltip"
+                                                     title="{{ round($summary['total_hours'], 2) }} jam kerja produktif dari {{ $summary['net_work_hours'] }} jam kerja bersih">
+                                                    {{ round($pct) }}%
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                @empty
+                                <tr><td colspan="10" class="text-center py-4 text-muted">Tidak ada data</td></tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- DAFTAR AKTIVITAS (Bagian yang sebelumnya error/kepotong) --}}
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white fw-bold">
+            <i class="fas fa-list-ul me-2 text-primary"></i>Daftar Aktivitas Detail
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 small align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3">Tanggal</th>
+                            <th>Teknisi</th>
+                            <th>Kategori</th>
+                            <th>Deskripsi</th>
+                            <th>Mulai</th>
+                            <th>Jeda/Pending</th>
+                            <th>Resume</th>
+                            <th>Selesai</th>
+                            <th>Durasi</th>
+                            <th>Status</th>
+                            <th class="text-center">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($activities as $act)
+                        <tr>
+                            <td class="ps-3">
+                                <strong>{{ $act->start_time->format('d/m/Y') }}</strong>
+                            </td>
+                            <td>
+                                <span class="fw-bold">{{ $act->user->name }}</span>
+                            </td>
+                            <td>
+                                @php
+                                    $color = $act->category == 'PM' ? 'success' :
+                                            ($act->category == 'Breakdown' ? 'danger' : 'info');
+                                @endphp
+                                <span class="badge bg-{{ $color }}">{{ $act->category }}</span>
+                            </td>
+                            <td>
+                                <div class="text-truncate" style="max-width: 200px;">
+                                    {{ $act->description }}
+                                </div>
+                            </td>
+                            <td>{{ $act->start_time->format('H:i') }}</td>
+                            <td>
+                                @if(data_get($act, 'pause_context.pending_at'))
+                                    <div class="small fw-bold text-warning">
+                                        {{ \Carbon\Carbon::parse(data_get($act, 'pause_context.pending_at'))->format('d/m H:i') }}
+                                    </div>
+                                    @if(data_get($act, 'pause_context.pending_label'))
+                                        <small class="text-muted d-block">{{ data_get($act, 'pause_context.pending_label') }}</small>
+                                    @endif
+                                @else
+                                    <span class="text-muted">-</span>
+                                @endif
+                            </td>
+                            <td>
+                                @if(data_get($act, 'pause_context.resumed_at'))
+                                    <span class="small text-primary fw-bold">
+                                        {{ \Carbon\Carbon::parse(data_get($act, 'pause_context.resumed_at'))->format('d/m H:i') }}
+                                    </span>
+                                @else
+                                    <span class="text-muted">-</span>
+                                @endif
+                            </td>
+                            <td>
+                                @if($act->status == 'running')
+                                    <span class="text-warning fw-bold">Running...</span>
+                                @elseif($act->status == 'paused')
+                                    <span class="text-warning fw-bold">
+                                        {{ $act->paused_at ? $act->paused_at->format('H:i') : 'Paused...' }}
+                                    </span>
+                                @else
+                                    {{ $act->end_time ? $act->end_time->format('H:i') : '-' }}
+                                @endif
+                            </td>
+                            <td>
+                                @if($act->status == 'running')
+                                    <span class="badge bg-warning text-dark">
+                                        <i class="fas fa-spinner fa-spin me-1"></i>
+                                        {{ $act->duration }} m
+                                    </span>
+                                @elseif($act->status == 'paused')
+                                    <span class="badge bg-dark">
+                                        <i class="fas fa-pause me-1"></i>
+                                        {{ $act->duration }} m
+                                    </span>
+                                @else
+                                    <span class="fw-bold">{{ $act->duration ?? '-' }} m</span>
+                                @endif
+                            </td>
+                            <td>
+                                @if($act->status == 'running')
+                                    <span class="badge bg-success"><i class="fas fa-play me-1"></i>Running</span>
+                                @elseif($act->status == 'paused')
+                                    <span class="badge bg-warning text-dark"><i class="fas fa-pause me-1"></i>Paused</span>
+                                @else
+                                    <span class="badge bg-secondary">Completed</span>
+                                @endif
+                            </td>
+                            <td class="text-center">
+                                <div class="btn-group btn-group-sm">
+                                    {{-- Link ke PM Check jika kategori PM --}}
+                                    @if($act->category == 'PM' && $act->pmCheck)
+                                        <a href="{{ route('pm.execution.show', $act->pmCheck->id) }}"
+                                           class="btn btn-outline-success" title="Lihat PM Check">
+                                            <i class="fas fa-clipboard-check"></i>
+                                        </a>
+                                    @endif
+
+                                    {{-- Link ke Ticket jika kategori Breakdown --}}
+                                    @if($act->category == 'Breakdown' && $act->ticket)
+                                        <a href="{{ route('tickets.show', $act->ticket->id) }}"
+                                           class="btn btn-outline-danger" title="Lihat Tiket">
+                                            <i class="fas fa-ticket-alt"></i>
+                                        </a>
+                                    @endif
+
+                                    {{-- Info detail --}}
+                                    <button type="button" class="btn btn-outline-info"
+                                            data-bs-toggle="modal" data-bs-target="#detailModal{{ $act->id }}"
+                                            title="Detail">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </div>
+
+                                {{-- Modal Detail --}}
+                                <div class="modal fade" id="detailModal{{ $act->id }}" tabindex="-1">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title">Detail Aktivitas</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <table class="table table-sm">
+                                                    <tr><td width="40%">Teknisi</td><td><strong>{{ $act->user->name }}</strong></td></tr>
+                                                    <tr><td>Kategori</td><td><span class="badge bg-{{ $color }}">{{ $act->category }}</span></td></tr>
+                                                    <tr><td>Deskripsi</td><td>{{ $act->description }}</td></tr>
+                                                    <tr><td>Mulai</td><td>{{ $act->start_time->format('d/m/Y H:i') }}</td></tr>
+                                                    <tr>
+                                                        <td>Jeda/Pending</td>
+                                                        <td>
+                                                            @if(data_get($act, 'pause_context.pending_at'))
+                                                                {{ \Carbon\Carbon::parse(data_get($act, 'pause_context.pending_at'))->format('d/m/Y H:i') }}
+                                                                @if(data_get($act, 'pause_context.pending_label'))
+                                                                    <div class="small text-muted">{{ data_get($act, 'pause_context.pending_label') }}</div>
+                                                                @endif
+                                                            @else
+                                                                -
+                                                            @endif
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>Resume</td>
+                                                        <td>
+                                                            @if(data_get($act, 'pause_context.resumed_at'))
+                                                                {{ \Carbon\Carbon::parse(data_get($act, 'pause_context.resumed_at'))->format('d/m/Y H:i') }}
+                                                            @else
+                                                                -
+                                                            @endif
+                                                        </td>
+                                                    </tr>
+                                                    <tr><td>Selesai</td><td>
+                                                        @if($act->status == 'paused')
+                                                            {{ $act->paused_at ? $act->paused_at->format('d/m/Y H:i') : 'Masih dijeda' }}
+                                                        @else
+                                                            {{ $act->end_time ? $act->end_time->format('d/m/Y H:i') : 'Masih berjalan' }}
+                                                        @endif
+                                                    </td></tr>
+                                                    <tr><td>Durasi</td><td>
+                                                        @if($act->status == 'running')
+                                                            {{ $act->duration }} menit (running)
+                                                        @elseif($act->status == 'paused')
+                                                            {{ $act->duration }} menit (paused)
+                                                        @else
+                                                            {{ $act->duration }} menit
+                                                        @endif
+                                                    </td></tr>
+                                                    @if($act->total_pause_minutes ?? 0)
+                                                    <tr><td>Total Jeda Terekam</td><td>{{ $act->total_pause_minutes }} menit</td></tr>
+                                                    @endif
+                                                    @if(!empty($act->pause_resume_log))
+                                                    <tr>
+                                                        <td>Log Pause/Resume</td>
+                                                        <td>
+                                                            @foreach($act->pause_resume_log as $log)
+                                                                <div class="small mb-1">
+                                                                    <strong>{{ ucfirst($log['type'] ?? '-') }}</strong>
+                                                                    - {{ \Carbon\Carbon::parse($log['at'])->format('d/m/Y H:i') }}
+                                                                    @if(!empty($log['reason']))
+                                                                        <div class="text-muted">{{ $log['reason'] }}</div>
+                                                                    @elseif(!empty($log['note']))
+                                                                        <div class="text-muted">{{ $log['note'] }}</div>
+                                                                    @endif
+                                                                </div>
+                                                            @endforeach
+                                                        </td>
+                                                    </tr>
+                                                    @endif
+                                                    @if($act->category == 'PM' && $act->pmCheck)
+                                                    <tr>
+                                                        <td>PM Check</td>
+                                                        <td>
+                                                            <a href="{{ route('pm.execution.show', $act->pmCheck->id) }}" class="btn btn-sm btn-success">
+                                                                <i class="fas fa-external-link-alt me-1"></i>Lihat PM
+                                                            </a>
+                                                        </td>
+                                                    </tr>
+                                                    @endif
+                                                    @if($act->category == 'Breakdown' && $act->ticket)
+                                                    <tr>
+                                                        <td>Tiket</td>
+                                                        <td>
+                                                            <a href="{{ route('tickets.show', $act->ticket->id) }}" class="btn btn-sm btn-danger">
+                                                                <i class="fas fa-external-link-alt me-1"></i>{{ $act->ticket->ticket_no }}
+                                                            </a>
+                                                        </td>
+                                                    </tr>
+                                                    @endif
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        @empty
+                        <tr><td colspan="11" class="text-center py-5 text-muted">Tidak ada aktivitas ditemukan untuk filter ini.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {{-- DATE RANGE INFO --}}
+    <div class="text-center mt-3 mb-5">
+        <small class="text-muted">
+            <i class="fas fa-calendar me-1"></i>
+            Periode: {{ Carbon\Carbon::parse($dateFrom)->format('d M Y') }} - {{ Carbon\Carbon::parse($dateTo)->format('d M Y') }}
+        </small>
+    </div>
+</div>
+@endsection
+
+@push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // ========================================
+    // PRODUCTIVITY CHART
+    // ========================================
+    const ctx = document.getElementById('productivityChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: {!! json_encode($chartLabels) !!},
+            datasets: [{
+                label: 'Jam Kerja',
+                data: {!! json_encode($chartData) !!},
+                backgroundColor: ['#4e73df', '#1cc88a', '#f6c23e', '#e74a3b', '#36b9cc', '#858796'],
+                borderRadius: 5
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Jam' }
+                }
+            }
+        }
+    });
+});
+</script>
+@endpush

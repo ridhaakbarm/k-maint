@@ -1,0 +1,75 @@
+// Fonts
+// @import url('https://fonts.googleapis.com/css?family=Nunito');
+// @import url('https://fonts.googleapis.com/css?family=Poppins:300,400,400i,700');
+
+// Variables
+@import 'variables';
+
+// Bootstrap
+@import '~bootstrap/scss/bootstrap';
+
+#app {
+    font-family: $font-family-sans-serif;
+}
+
+.login-page {
+    background-color: #343a40 !important;
+    color: #ffffff !important;
+    a {
+        color: #ffffff !important;
+    }
+    a:hover {
+        color: $green !important;
+    }
+    .login-logo {
+        img {
+            width: 100%;
+            filter: brightness(0) invert(1);
+        }
+    }
+    .login-box {
+        .card {
+            box-shadow: 0 0 1.5rem $green;
+        }
+    }
+}
+.bg-avian-primary {
+    background-color: $avian-primary !important;
+    color: #ffffff !important;
+}
+.bg-avian-secondary {
+    background-color: $avian-secondary !important;
+    color: #ffffff !important;
+}
+.btn-avian-primary {
+    background-color: $avian-primary !important;
+    color: #ffffff !important;
+    border-color: $avian-primary !important;
+
+    &:hover {
+        background-color: $avian-secondary !important;
+    }
+}
+.btn-avian-secondary {
+    background-color: $avian-secondary !important;
+    color: #ffffff !important;
+    border-color: $avian-secondary !important;
+
+    &:hover {
+        background-color: $avian-primary !important;
+    }
+}
+.avian {
+    .img-white {
+        filter: brightness(0) invert(1);
+    }
+    .navbar-avian {
+        background-color: $avian-secondary !important;
+    }
+    .sidebar-dark-avian {
+        .nav-sidebar>.nav-item>.nav-link.active {
+            background-color: $avian-secondary !important;
+            color: #ffffff;
+        }
+    }
+}
