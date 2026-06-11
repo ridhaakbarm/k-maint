@@ -23,6 +23,7 @@ class MonitoringController extends Controller
         $year = $request->get('year', date('Y'));
         $month = $request->get('month', 'all');
         $currentWeek = now()->weekOfYear;
+        $currentYear = now()->year;
 
         // 1. STATISTIK TIKET
         $ticketQuery = Ticket::query();
@@ -40,24 +41,45 @@ class MonitoringController extends Controller
         ];
 
         // 2. STATISTIK PM
-        $weeklyPmSchedules = PmSchedule::where('is_active', true)
-            ->whereHas('checklistTemplates', function ($q) use ($currentWeek) {
+        $weeklyPmSchedules = PmSchedule::with(['checklistTemplates' => function ($q) use ($currentWeek) {
             $q->where('is_active', true)
                 ->where(function ($query) use ($currentWeek) {
-                $query->whereJsonContains('active_weeks', $currentWeek)
-                    ->orWhereJsonContains('active_weeks', (string)$currentWeek);
-            }
-            );
-        })->get();
+                    $query->whereJsonContains('active_weeks', $currentWeek)
+                        ->orWhereJsonContains('active_weeks', (string)$currentWeek);
+                });
+        }])
+            ->where('is_active', true)
+            ->where('schedule_type', 'weekly')
+            ->whereHas('checklistTemplates', function ($q) use ($currentWeek) {
+                $q->where('is_active', true)
+                    ->where(function ($query) use ($currentWeek) {
+                        $query->whereJsonContains('active_weeks', $currentWeek)
+                            ->orWhereJsonContains('active_weeks', (string)$currentWeek);
+                    });
+            })->get();
+
+        $weeklyPmScheduleIds = $weeklyPmSchedules->pluck('id');
+        $pmTotalItems = $weeklyPmSchedules->sum(fn($schedule) => $schedule->checklistTemplates->count());
+        $completedPmStatuses = ['completed', 'verified', 'approved'];
+        $pmDoneItems = PmCheckItem::whereHas('pmCheck', function ($q) use ($currentWeek, $currentYear, $weeklyPmScheduleIds) {
+            $q->where('week_number', $currentWeek)
+                ->whereYear('check_date', $currentYear)
+                ->whereIn('pm_schedule_id', $weeklyPmScheduleIds);
+        })
+            ->whereNotNull('condition')
+            ->where('condition', '!=', '')
+            ->count();
 
         $pmStats = [
             'machines_total' => $weeklyPmSchedules->count(),
             'machines_done' => PmCheck::where('week_number', $currentWeek)
-            ->whereIn('status', ['completed', 'verified', 'approved'])
-            ->count(),
-            'items_done' => PmCheckItem::whereHas('pmCheck', function ($q) use ($currentWeek) {
-            $q->where('week_number', $currentWeek);
-        })->whereNotNull('condition')->count(),
+                ->whereYear('check_date', $currentYear)
+                ->whereIn('pm_schedule_id', $weeklyPmScheduleIds)
+                ->whereIn('status', $completedPmStatuses)
+                ->count(),
+            'items_total' => $pmTotalItems,
+            'items_done' => $pmDoneItems,
+            'completion_percentage' => $pmTotalItems > 0 ? round(($pmDoneItems / $pmTotalItems) * 100, 1) : 0,
         ];
 
         // 3. LOGIKA WORKLOAD (FIX ERROR: Undefined Variable $availableMinutes)

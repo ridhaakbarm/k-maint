@@ -52,20 +52,20 @@
                 <div class="row g-2">
                     <div class="col-4">
                         <div class="p-2 bg-secondary text-white rounded-3 text-center">
-                            <div class="small fw-bold">SCHEDULED</div>
-                            <h3 class="fw-bold mb-0">{{ $pmStats['machines_total'] }} <small class="fs-6">Unit</small></h3>
+                            <div class="small fw-bold">PROGRESS</div>
+                            <h3 class="fw-bold mb-0">{{ $pmStats['completion_percentage'] }}<small class="fs-6">%</small></h3>
                         </div>
                     </div>
                     <div class="col-4">
                         <div class="p-2 bg-success text-white rounded-3 text-center position-relative">
-                            <div class="small fw-bold">MESIN DONE</div>
-                            <h3 class="fw-bold mb-0">{{ $pmStats['machines_done'] }}</h3>
+                            <div class="small fw-bold">TOTAL ITEMS</div>
+                            <h3 class="fw-bold mb-0">{{ $pmStats['items_total'] }}</h3>
                         </div>
                     </div>
                     <div class="col-4">
                         <div class="p-2 bg-primary text-white rounded-3 text-center">
                             <div class="small fw-bold">ITEMS DONE</div>
-                            <h3 class="fw-bold mb-0">{{ $pmStats['items_done'] }}</h3>
+                            <h3 class="fw-bold mb-0">{{ $pmStats['items_done'] }} <small class="fs-6">/ {{ $pmStats['items_total'] }}</small></h3>
                         </div>
                     </div>
                 </div>
