@@ -35,8 +35,9 @@ class TicketsExport implements FromCollection, WithHeadings, WithMapping, WithSt
     {
         return [
             'Ticket No',
-            'FA Code',
+            'Mesin / Aset',
             'Subject',
+            'Description',
             'Requester',
             'Department',
             'Status',
@@ -63,12 +64,10 @@ class TicketsExport implements FromCollection, WithHeadings, WithMapping, WithSt
 
     public function map($ticket): array
     {
-        // FA Code with null safety
-        $assetCode = '-';
-        $assetName = '';
+        // Asset name with null safety
+        $assetName = '-';
         if ($ticket->asset) {
-            $assetCode = $ticket->asset->fa_code ?? '-';
-            $assetName = $ticket->asset->name ?? '';
+            $assetName = $ticket->asset->name ?? '-';
         }
 
         // Assignment Type
@@ -198,8 +197,9 @@ class TicketsExport implements FromCollection, WithHeadings, WithMapping, WithSt
 
         return [
             $ticket->ticket_no,
-            $assetCode . ($assetName ? "\n" . $assetName : ''),
-            $ticket->subject . ($ticket->description ? "\n" . $ticket->description : ''),
+            $assetName,
+            $ticket->subject ?? '-',
+            $ticket->description ?? '-',
             $requesterName,
             $requesterDept,
             ucfirst($ticket->status),
@@ -253,7 +253,7 @@ class TicketsExport implements FromCollection, WithHeadings, WithMapping, WithSt
         $rowCount = count($this->tickets) + 1; // +1 karena heading
 
         // Border untuk semua sel
-        $sheet->getStyle('A1:X' . $rowCount)->applyFromArray([
+        $sheet->getStyle('A1:Y' . $rowCount)->applyFromArray([
             'borders' => [
                 'allBorders' => [
                     'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
@@ -263,25 +263,26 @@ class TicketsExport implements FromCollection, WithHeadings, WithMapping, WithSt
         ]);
 
         // Auto wrap text untuk kolom yang membutuhkan
-        $sheet->getStyle('B:B')->getAlignment()->setWrapText(true); // FA Code
-        $sheet->getStyle('C:C')->getAlignment()->setWrapText(true); // Subject + Description
-        $sheet->getStyle('N:N')->getAlignment()->setWrapText(true); // Vendor Details
-        $sheet->getStyle('O:O')->getAlignment()->setWrapText(true); // Problem Cause
-        $sheet->getStyle('P:P')->getAlignment()->setWrapText(true); // GA Notes
-        $sheet->getStyle('Q:Q')->getAlignment()->setWrapText(true); // User Notes
-        $sheet->getStyle('R:R')->getAlignment()->setWrapText(true); // Serah Terima Teknisi
-        $sheet->getStyle('S:S')->getAlignment()->setWrapText(true); // Serah Terima User
-        $sheet->getStyle('W:W')->getAlignment()->setWrapText(true); // Riwayat Notes
-        $sheet->getStyle('X:X')->getAlignment()->setWrapText(true); // Response Time
+        $sheet->getStyle('B:B')->getAlignment()->setWrapText(true); // Mesin / Aset
+        $sheet->getStyle('C:C')->getAlignment()->setWrapText(true); // Subject
+        $sheet->getStyle('D:D')->getAlignment()->setWrapText(true); // Description
+        $sheet->getStyle('O:O')->getAlignment()->setWrapText(true); // Vendor Details
+        $sheet->getStyle('P:P')->getAlignment()->setWrapText(true); // Problem Cause
+        $sheet->getStyle('Q:Q')->getAlignment()->setWrapText(true); // GA Notes
+        $sheet->getStyle('R:R')->getAlignment()->setWrapText(true); // User Notes
+        $sheet->getStyle('S:S')->getAlignment()->setWrapText(true); // Serah Terima Teknisi
+        $sheet->getStyle('T:T')->getAlignment()->setWrapText(true); // Serah Terima User
+        $sheet->getStyle('X:X')->getAlignment()->setWrapText(true); // Riwayat Notes
+        $sheet->getStyle('Y:Y')->getAlignment()->setWrapText(true); // Response Time
 
         // Bold header
-        $sheet->getStyle('A1:X1')->getFont()->setBold(true);
+        $sheet->getStyle('A1:Y1')->getFont()->setBold(true);
 
         // Center header text
-        $sheet->getStyle('A1:X1')->getAlignment()->setHorizontal('center');
+        $sheet->getStyle('A1:Y1')->getAlignment()->setHorizontal('center');
 
         // Warna latar belakang header
-        $sheet->getStyle('A1:X1')->getFill()->applyFromArray([
+        $sheet->getStyle('A1:Y1')->getFill()->applyFromArray([
             'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
             'color' => ['argb' => 'FFE0E0E0'],
         ]);
