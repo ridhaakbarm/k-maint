@@ -23,7 +23,6 @@
                     <tr><th class="bg-light">Bagian yang Dicek</th><td>{{ $checklistTemplate->checked_part }}</td></tr>
                     <tr><th class="bg-light">Instruksi</th><td>{{ $checklistTemplate->instructions }}</td></tr>
                     <tr><th class="bg-light">Standar Pengecekan</th><td>{{ $checklistTemplate->check_standard }}</td></tr>
-                    <tr><th class="bg-light">Jenis Pekerjaan</th><td>{{ $checklistTemplate->operation_source ?? '-' }}</td></tr>
                     <tr><th class="bg-light">Urutan</th><td>{{ $checklistTemplate->order }}</td></tr>
                     <tr>
                         <th class="bg-light">Minggu Aktif</th>

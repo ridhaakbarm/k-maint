@@ -2,147 +2,213 @@
 
 namespace App\Exports;
 
-use App\Models\PmCheck;
 use App\Models\PmCheckItem;
+use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
+use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\WithStyles;
-use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
-use Carbon\Carbon;
 
 class PmExport implements FromCollection, WithHeadings, WithMapping, WithStyles, ShouldAutoSize
 {
-    protected $weekNumber;
-    protected $scheduleType;
+    protected ?Carbon $startDate;
+    protected ?Carbon $endDate;
+    protected ?Collection $rows = null;
 
-    public function __construct($weekNumber = null, $scheduleType = 'weekly')
+    public function __construct($startDate = null, $endDate = null)
     {
-        $this->weekNumber = $weekNumber ?? Carbon::now()->weekOfYear;
-        $this->scheduleType = $scheduleType;
+        $this->startDate = $startDate ? Carbon::parse($startDate)->startOfDay() : null;
+        $this->endDate = $endDate ? Carbon::parse($endDate)->endOfDay() : null;
     }
 
     public function collection()
     {
-        // Ambil semua PM checks untuk week yang dipilih
-        $pmChecks = PmCheck::with([
-            'pmSchedule.asset',
-            'checkItems.checklistTemplate',
-            'technician'
-        ])
-        ->where('week_number', $this->weekNumber)
-        ->whereHas('pmSchedule', function($q) {
-            $q->where('schedule_type', $this->scheduleType);
-        })
-        ->get();
+        $query = PmCheckItem::with([
+            'checklistTemplate',
+            'checkedBy',
+            'verifiedBy',
+            'pmCheck.checkItems',
+            'pmCheck.pmSchedule.asset',
+            'pmCheck.technician',
+            'pmCheck.admin',
+        ])->whereHas('pmCheck', function ($q) {
+            if ($this->startDate) {
+                $q->where(function ($dateQuery) {
+                    $dateQuery->whereDate('check_date', '>=', $this->startDate->toDateString())
+                        ->orWhere(function ($fallbackQuery) {
+                            $fallbackQuery->whereNull('check_date')
+                                ->whereDate('due_date', '>=', $this->startDate->toDateString());
+                        });
+                });
+            }
 
-        return $pmChecks;
+            if ($this->endDate) {
+                $q->where(function ($dateQuery) {
+                    $dateQuery->whereDate('check_date', '<=', $this->endDate->toDateString())
+                        ->orWhere(function ($fallbackQuery) {
+                            $fallbackQuery->whereNull('check_date')
+                                ->whereDate('due_date', '<=', $this->endDate->toDateString());
+                        });
+                });
+            }
+        })
+            ->join('pm_checks', 'pm_check_items.pm_check_id', '=', 'pm_checks.id')
+            ->leftJoin('checklist_templates', 'pm_check_items.checklist_template_id', '=', 'checklist_templates.id')
+            ->orderBy('pm_checks.check_date')
+            ->orderBy('pm_checks.due_date')
+            ->orderBy('pm_checks.week_number')
+            ->orderBy('checklist_templates.order')
+            ->select('pm_check_items.*');
+
+        return $this->rows = $query->get();
     }
 
     public function headings(): array
     {
         return [
+            'No PM',
             'Week',
+            'Tipe Jadwal',
             'Mesin / Aset',
-            'FA Code',
+            'Nama Jadwal',
             'Teknisi',
             'Tanggal Cek',
+            'Due Date',
             'Shift',
             'Status PM',
             'Total Item',
             'Item Selesai',
             'Progress %',
-            'Detail Checklist',
-            'Waktu Verifikasi',
-            'Verified By'
+            'Urutan Item',
+            'Item Checklist',
+            'Bagian Dicek',
+            'Instruksi',
+            'Standar Pengecekan',
+            'Kondisi',
+            'Waktu Dicek',
+            'Dicek Oleh',
+            'Action Taken',
+            'Next Action',
+            'Status Follow Up',
+            'Catatan Follow Up',
+            'Tanggal Eksekusi',
+            'Executed By',
+            'Verified By',
+            'Approved By',
+            'Remark',
+            'Admin Verifikasi',
         ];
     }
 
-    public function map($pmCheck): array
+    public function map($item): array
     {
-        // Hitung progress
-        $totalItems = $pmCheck->checkItems->count();
-        $completedItems = $pmCheck->checkItems->whereNotNull('condition')->count();
+        $pmCheck = $item->pmCheck;
+        $schedule = $pmCheck?->pmSchedule;
+        $template = $item->checklistTemplate;
+
+        $totalItems = $pmCheck?->checkItems?->count() ?? 0;
+        $completedItems = $pmCheck?->checkItems?->whereNotNull('condition')->count() ?? 0;
         $progress = $totalItems > 0 ? round(($completedItems / $totalItems) * 100, 1) : 0;
 
-        // Generate detail checklist
-        $checklistDetails = [];
-        foreach ($pmCheck->checkItems as $item) {
-            $template = $item->checklistTemplate;
-            if ($template) {
-                $status = $item->condition ?? 'Belum Dicek';
-                $checklistDetails[] = ($template->item_name ?? '-') . ': ' . $status;
-            }
-        }
-        $detailString = implode("\n", $checklistDetails);
-
-        // Format dates
-        $checkDate = $pmCheck->check_date
-            ? (is_string($pmCheck->check_date)
-                ? Carbon::parse($pmCheck->check_date)->format('d/m/Y')
-                : $pmCheck->check_date->format('d/m/Y'))
-            : '-';
-
-        $verifiedAt = $pmCheck->verified_at
-            ? (is_string($pmCheck->verified_at)
-                ? Carbon::parse($pmCheck->verified_at)->format('d/m/Y H:i')
-                : $pmCheck->verified_at->format('d/m/Y H:i'))
-            : '-';
-
         return [
-            $pmCheck->week_number,
-            $pmCheck->pmSchedule->asset->name ?? '-',
-            $pmCheck->pmSchedule->asset->fa_code ?? '-',
+            $pmCheck->id ?? '-',
+            $pmCheck->week_number ?? '-',
+            $this->scheduleTypeLabel($schedule->schedule_type ?? null),
+            $schedule->asset->name ?? '-',
+            $schedule->name ?? '-',
             $pmCheck->technician->name ?? $pmCheck->technician_name ?? '-',
-            $checkDate,
+            $this->formatDate($pmCheck->check_date ?? null),
+            $this->formatDate($pmCheck->due_date ?? null),
             $pmCheck->shift ?? '-',
-            strtoupper(str_replace('_', ' ', $pmCheck->status)),
+            $this->statusLabel($pmCheck->status ?? null),
             $totalItems,
             $completedItems,
             $progress . '%',
-            $detailString,
-            $verifiedAt,
+            $template->order ?? '-',
+            $template->item_name ?? '-',
+            $template->checked_part ?? '-',
+            $template->instructions ?? '-',
+            $template->check_standard ?? '-',
+            $item->condition ?? 'Belum Dicek',
+            $this->formatDate($item->checked_at ?? null, 'd/m/Y H:i'),
+            $item->checkedBy->name ?? '-',
+            $item->action_taken ?? '-',
+            $item->next_action ?? '-',
+            $item->follow_up_status ?? '-',
+            $item->follow_up_note ?? '-',
+            $this->formatDate($item->execution_date ?? null),
+            $item->executed_by ?? '-',
+            $item->verified_by ?? $item->verifiedBy->name ?? '-',
+            $item->approved_by ?? '-',
+            $item->remark ?? '-',
             $pmCheck->admin->name ?? '-',
         ];
     }
 
     public function styles(Worksheet $sheet)
     {
-        $rowCount = count($this->collection()) + 1;
+        $rowCount = ($this->rows ? $this->rows->count() : 0) + 1;
+        $lastColumn = $sheet->getHighestColumn();
+        $dataRange = 'A1:' . $lastColumn . $rowCount;
+        $headerRange = 'A1:' . $lastColumn . '1';
 
-        // Border untuk semua sel
-        $sheet->getStyle('A1:M' . $rowCount)->applyFromArray([
+        $sheet->getStyle($dataRange)->applyFromArray([
             'borders' => [
                 'allBorders' => [
-                    'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
+                    'borderStyle' => Border::BORDER_THIN,
                     'color' => ['argb' => '000000'],
                 ],
             ],
         ]);
 
-        // Auto wrap text
-        $sheet->getStyle('B:B')->getAlignment()->setWrapText(true); // Mesin
-        $sheet->getStyle('L:L')->getAlignment()->setWrapText(true); // Detail Checklist
-
-        // Bold header
-        $sheet->getStyle('A1:M1')->getFont()->setBold(true);
-
-        // Center header text
-        $sheet->getStyle('A1:M1')->getAlignment()->setHorizontal('center');
-
-        // Warna latar belakang header
-        $sheet->getStyle('A1:M1')->getFill()->applyFromArray([
-            'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+        $sheet->getStyle($headerRange)->getFont()->setBold(true);
+        $sheet->getStyle($headerRange)->getAlignment()->setHorizontal('center');
+        $sheet->getStyle($headerRange)->getFill()->applyFromArray([
+            'fillType' => Fill::FILL_SOLID,
             'color' => ['argb' => 'FFE0E0E0'],
         ]);
 
-        // Set tinggi row header
         $sheet->getRowDimension(1)->setRowHeight(25);
-
-        // Center alignment untuk kolom numerik
-        $sheet->getStyle('H:K')->getAlignment()->setHorizontal('center');
+        $sheet->getStyle('C:E')->getAlignment()->setWrapText(true);
+        $sheet->getStyle('O:AD')->getAlignment()->setWrapText(true);
+        $sheet->getStyle('A:N')->getAlignment()->setVertical('top');
+        $sheet->getStyle('O:AE')->getAlignment()->setVertical('top');
+        $sheet->getStyle('A:C')->getAlignment()->setHorizontal('center');
+        $sheet->getStyle('G:H')->getAlignment()->setHorizontal('center');
+        $sheet->getStyle('J:N')->getAlignment()->setHorizontal('center');
 
         return [];
+    }
+
+    private function formatDate($value, string $format = 'd/m/Y'): string
+    {
+        if (!$value) {
+            return '-';
+        }
+
+        return $value instanceof Carbon
+            ? $value->format($format)
+            : Carbon::parse($value)->format($format);
+    }
+
+    private function scheduleTypeLabel(?string $type): string
+    {
+        return [
+            'daily' => 'Daily',
+            'weekly' => 'Weekly',
+            'monthly' => 'Monthly',
+            'quarterly' => 'Quarterly',
+            'yearly' => 'Yearly',
+        ][$type] ?? ($type ? ucfirst($type) : '-');
+    }
+
+    private function statusLabel(?string $status): string
+    {
+        return $status ? strtoupper(str_replace('_', ' ', $status)) : '-';
     }
 }

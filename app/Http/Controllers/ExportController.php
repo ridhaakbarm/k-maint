@@ -53,12 +53,17 @@ class ExportController extends Controller
     // Export PM ke Excel
     public function exportPm(Request $request)
     {
-        $weekNumber = $request->get('week', now()->weekOfYear);
-        $scheduleType = $request->get('schedule_type', 'weekly');
+        $validated = $request->validate([
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date',
+        ]);
+
+        $startDate = $validated['start_date'] ?? now()->startOfMonth()->toDateString();
+        $endDate = $validated['end_date'] ?? now()->endOfMonth()->toDateString();
 
         // Generate filename
-        $filename = 'pm_week_' . $weekNumber . '_export_' . date('Y-m-d_H-i-s') . '.xlsx';
+        $filename = 'pm_export_' . $startDate . '_sd_' . $endDate . '_' . date('Y-m-d_H-i-s') . '.xlsx';
 
-        return Excel::download(new PmExport($weekNumber, $scheduleType), $filename);
+        return Excel::download(new PmExport($startDate, $endDate), $filename);
     }
 }

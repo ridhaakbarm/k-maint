@@ -170,6 +170,7 @@ Route::middleware(['auth'])->group(function () {
     // Monitoring Aktivitas Tim (Admin Only)
     Route::get('/monitoring/team', [MonitoringController::class, 'teamMonitoring'])->name('monitoring.team');
     Route::get('/monitoring/team/export', [MonitoringController::class, 'exportTeamMonitoring'])->name('monitoring.team.export');
+    Route::get('/monitoring/pm', [MonitoringController::class, 'pmMonitoring'])->name('monitoring.pm');
 
     // Aksi Monitoring
     Route::post('/monitoring/start', [MonitoringController::class, 'startActivity'])->name('monitoring.start');

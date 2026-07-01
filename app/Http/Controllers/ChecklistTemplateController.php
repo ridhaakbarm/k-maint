@@ -39,11 +39,16 @@ class ChecklistTemplateController extends Controller
         // Mendukung parameter pm_schedule_id dari link "Tambah Manual"
         $preselected_schedule = $request->query('pm_schedule_id');
         
-        $pmSchedules = PmSchedule::with('asset')
+        $pmSchedules = PmSchedule::with(['asset', 'checklistTemplates:id,pm_schedule_id,order'])
             ->where('is_active', true)
             ->get();
+
+        $nextOrders = $pmSchedules->mapWithKeys(function ($schedule) {
+            $lastOrder = $schedule->checklistTemplates->max('order');
+            return [$schedule->id => ($lastOrder ?? -1) + 1];
+        });
             
-        return view('checklist-templates.create', compact('pmSchedules', 'preselected_schedule'));
+        return view('checklist-templates.create', compact('pmSchedules', 'preselected_schedule', 'nextOrders'));
     }
 
     public function store(Request $request)

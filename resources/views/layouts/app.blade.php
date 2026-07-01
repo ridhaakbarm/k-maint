@@ -451,9 +451,16 @@
                             </a>
                         </li>
 
-                        {{-- 4. PREVENTIVE MAINTENANCE: Admin & MTC --}}
-                        @if(Auth::user()->isAdmin() || Auth::user()->isMTC())
+                        {{-- 4. PREVENTIVE MAINTENANCE: Admin, MTC & Management --}}
+                        @if(Auth::user()->isAdmin() || Auth::user()->isMTC() || Auth::user()->isManager() || Auth::user()->isSPV())
                         <li class="nav-header text-uppercase">Preventive Maintenance</li>
+                        <li class="nav-item">
+                            <a href="{{ route('monitoring.pm') }}" class="nav-link {{ Route::is('monitoring.pm') ? 'active' : '' }}">
+                                <i class="fas fa-chart-pie nav-icon"></i>
+                                <p>Monitoring PM</p>
+                            </a>
+                        </li>
+                        @if(Auth::user()->isAdmin() || Auth::user()->isMTC())
                         <li class="nav-item">
                             <a href="{{ route('pm.schedule.index') }}" class="nav-link {{ Route::is('pm.schedule.*') ? 'active' : '' }}">
                                 <i class="fas fa-calendar-check nav-icon"></i>
@@ -473,6 +480,7 @@
                                 <p>Tindakan Selanjutnya</p>
                             </a>
                         </li>
+                        @endif
                         @endif
 
                         {{-- 5. DATA MASTER & SETTINGS: Hanya Admin kawan --}}
@@ -619,32 +627,19 @@
                             <form action="{{ route('export.pm') }}" method="GET" id="exportPmForm">
                                 <div class="row g-3">
                                     <div class="col-md-6">
-                                        <label for="pm_week" class="form-label fw-bold">
-                                            <i class="fas fa-calendar-week me-2"></i>Week Number
+                                        <label for="pm_start_date" class="form-label fw-bold">
+                                            <i class="fas fa-calendar-alt me-2"></i>Tanggal Mulai
                                         </label>
-                                        <select class="form-select" id="pm_week" name="week">
-                                            <option value="{{ now()->weekOfYear }}" selected>
-                                                Week {{ now()->weekOfYear }} (Current Week)
-                                            </option>
-                                            @for($i = 1; $i <= 52; $i++)
-                                                @if($i != now()->weekOfYear)
-                                                    <option value="{{ $i }}">Week {{ $i }}</option>
-                                                @endif
-                                            @endfor
-                                        </select>
-                                        <small class="text-muted">Pilih week yang ingin diexport</small>
+                                        <input type="date" class="form-control" id="pm_start_date" name="start_date" value="{{ now()->startOfMonth()->toDateString() }}">
+                                        <small class="text-muted">Awal periode data PM yang ingin diexport</small>
                                     </div>
 
                                     <div class="col-md-6">
-                                        <label for="pm_schedule_type" class="form-label fw-bold">
-                                            <i class="fas fa-clock me-2"></i>Tipe Jadwal
+                                        <label for="pm_end_date" class="form-label fw-bold">
+                                            <i class="fas fa-calendar-check me-2"></i>Tanggal Akhir
                                         </label>
-                                        <select class="form-select" id="pm_schedule_type" name="schedule_type">
-                                            <option value="weekly" selected>Weekly</option>
-                                            <option value="monthly">Monthly</option>
-                                            <option value="quarterly">Quarterly</option>
-                                        </select>
-                                        <small class="text-muted">Pilih tipe jadwal PM</small>
+                                        <input type="date" class="form-control" id="pm_end_date" name="end_date" value="{{ now()->endOfMonth()->toDateString() }}">
+                                        <small class="text-muted">Akhir periode data PM yang ingin diexport</small>
                                     </div>
 
                                     <div class="col-12">
@@ -654,9 +649,10 @@
                                                 Informasi Export PM
                                             </h6>
                                             <ul class="mb-0 small">
-                                                <li>Data yang diexport: Week, Mesin/Aset, Teknisi, Progress, Detail Checklist</li>
+                                                <li>Data yang diexport mengikuti rentang tanggal cek atau due date PM.</li>
+                                                <li>Format Excel dibuat 1 baris per item checklist agar detail bisa difilter per kolom.</li>
+                                                <li>Kolom FA-Code tidak disertakan di export PM.</li>
                                                 <li>Status PM yang akan diexport: Semua status (In Progress, Completed, Verified)</li>
-                                                <li>Detail checklist menampilkan semua item dengan status pengecekan</li>
                                             </ul>
                                         </div>
                                     </div>

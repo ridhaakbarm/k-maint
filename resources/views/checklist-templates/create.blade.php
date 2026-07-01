@@ -1,6 +1,10 @@
 @extends('layouts.app')
 
 @section('content')
+@php
+    $selectedSchedule = old('pm_schedule_id', $preselected_schedule);
+    $defaultOrder = old('order', $selectedSchedule ? ($nextOrders[$selectedSchedule] ?? 0) : 0);
+@endphp
 <div class="row">
     <div class="col-md-8">
         <div class="card shadow-sm">
@@ -15,7 +19,7 @@
                         <select class="form-select @error('pm_schedule_id') is-invalid @enderror" name="pm_schedule_id" required>
                             <option value="">-- Pilih Jadwal & Mesin --</option>
                             @foreach($pmSchedules as $schedule)
-                                <option value="{{ $schedule->id }}" data-schedule-type="{{ $schedule->schedule_type }}" {{ old('pm_schedule_id') == $schedule->id ? 'selected' : '' }}>
+                                <option value="{{ $schedule->id }}" data-schedule-type="{{ $schedule->schedule_type }}" {{ old('pm_schedule_id', $preselected_schedule) == $schedule->id ? 'selected' : '' }}>
                                     {{ $schedule->asset->name ?? 'Mesin Tidak Ditemukan' }} - {{ str_replace('FA - ', '', $schedule->name) }}
                                 </option>
                             @endforeach
@@ -44,15 +48,11 @@
                     </div>
 
                     <div class="row align-items-center">
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label fw-bold">Jenis Pekerjaan (P/B/G)</label>
-                            <input type="text" class="form-control" name="operation_source" value="{{ old('operation_source') }}" placeholder="P">
-                        </div>
-                        <div class="col-md-4 mb-3">
+                        <div class="col-md-6 mb-3">
                             <label class="form-label fw-bold">Urutan *</label>
-                            <input type="number" class="form-control" name="order" value="{{ old('order', 0) }}" required>
+                            <input type="number" class="form-control" name="order" value="{{ $defaultOrder }}" required readonly>
                         </div>
-                        <div class="col-md-4 mb-3 pt-4">
+                        <div class="col-md-6 mb-3 pt-4">
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" name="is_active" id="is_active" value="1" checked>
                                 <label class="form-check-label" for="is_active">Template Aktif</label>
@@ -104,6 +104,8 @@
         document.getElementById('btnGenap').addEventListener('click', () => checkboxes.forEach(cb => cb.checked = (parseInt(cb.value) % 2 === 0)));
 
         const scheduleSelect = document.querySelector('[name="pm_schedule_id"]');
+        const orderInput = document.querySelector('[name="order"]');
+        const nextOrders = @json($nextOrders);
         const weeklyBox = document.getElementById('weeklyScheduleBox');
         const dailyInfo = document.getElementById('dailyScheduleInfo');
 
@@ -114,8 +116,16 @@
             dailyInfo.classList.toggle('d-none', !isDaily);
         }
 
-        scheduleSelect.addEventListener('change', toggleWeekSelector);
+        function updateOrder() {
+            orderInput.value = nextOrders[scheduleSelect.value] ?? 0;
+        }
+
+        scheduleSelect.addEventListener('change', function() {
+            toggleWeekSelector();
+            updateOrder();
+        });
         toggleWeekSelector();
+        updateOrder();
     });
 </script>
 @endsection
