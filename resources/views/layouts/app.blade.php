@@ -450,6 +450,18 @@
                                 <p>Buat Ticket (Breakdown)</p>
                             </a>
                         </li>
+                        @php
+                            $dept = strtolower(trim((string) Auth::user()->department));
+                            $canAccessInternalTickets = Auth::user()->isAdmin() || Auth::user()->isMTC() || in_array($dept, ['maintenance', 'engineering', 'mtc']);
+                        @endphp
+                        @if($canAccessInternalTickets)
+                        <li class="nav-item">
+                            <a href="{{ route('internal-tickets.index') }}" class="nav-link {{ Route::is('internal-tickets.*') ? 'active' : '' }}">
+                                <i class="fas fa-clipboard-check nav-icon text-info"></i>
+                                <p>Tiket Internal</p>
+                            </a>
+                        </li>
+                        @endif
 
                         {{-- 4. PREVENTIVE MAINTENANCE: Admin, MTC & Management --}}
                         @if(Auth::user()->isAdmin() || Auth::user()->isMTC() || Auth::user()->isManager() || Auth::user()->isSPV())

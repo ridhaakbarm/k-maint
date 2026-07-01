@@ -3,6 +3,15 @@
     <td class="text-center">
         <div class="btn-group btn-group-sm">
             <a href="{{ route('pm.execution.show', $item->pm_check_id) }}" class="btn btn-outline-primary" target="_blank"><i class="fas fa-eye"></i></a>
+            @php
+                $dept = strtolower(trim((string) Auth::user()->department));
+                $canCreateInternalTicket = Auth::user()->isAdmin() || Auth::user()->isMTC() || in_array($dept, ['maintenance', 'engineering', 'mtc']);
+            @endphp
+            @if($canCreateInternalTicket)
+                <a href="{{ route('internal-tickets.create', ['pm_check_item_id' => $item->id]) }}" class="btn btn-outline-info" title="Buat Tiket Internal">
+                    <i class="fas fa-clipboard-check"></i>
+                </a>
+            @endif
             <button type="button" class="btn btn-primary" onclick="openEditModal({{ json_encode($item) }})">
                 <i class="fas fa-pencil-alt"></i>
             </button>

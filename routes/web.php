@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 // Import Controller Sistem E-Ticket
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\TicketController;
+use App\Http\Controllers\InternalTicketController;
 use App\Http\Controllers\ExportController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\UserController;
@@ -72,6 +73,19 @@ Route::prefix('tickets')->name('tickets.')->group(function () {
     Route::post('/{ticket}/spv-review', [TicketController::class, 'spvReview'])->name('spvReview');
     Route::post('/{ticket}/resume', [TicketController::class, 'resumeWork'])->name('resumeWork');
     Route::post('/{ticket}/reject-by-user', [TicketController::class, 'rejectByUser'])->name('rejectByUser');
+    });
+
+    // --- FITUR TIKET INTERNAL (TEMUAN PM / INSTRUKSI LISAN) ---
+    Route::prefix('internal-tickets')->name('internal-tickets.')->group(function () {
+        Route::get('/', [InternalTicketController::class, 'index'])->name('index');
+        Route::get('/create', [InternalTicketController::class, 'create'])->name('create');
+        Route::post('/', [InternalTicketController::class, 'store'])->name('store');
+        Route::get('/{internalTicket}', [InternalTicketController::class, 'show'])->name('show');
+        Route::post('/{internalTicket}/start', [InternalTicketController::class, 'startWork'])->name('startWork');
+        Route::post('/{internalTicket}/progress', [InternalTicketController::class, 'updateProgress'])->name('updateProgress');
+        Route::post('/{internalTicket}/close', [InternalTicketController::class, 'close'])->name('close');
+        Route::post('/{internalTicket}/note', [InternalTicketController::class, 'addNote'])->name('addNote');
+        Route::delete('/{internalTicket}', [InternalTicketController::class, 'destroy'])->name('destroy');
     });
 
     // --- FITUR PREVENTIVE MAINTENANCE (EKSEKUSI) ---
