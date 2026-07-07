@@ -562,6 +562,14 @@
                                         </a>
                                     @endif
 
+                                    {{-- Link ke Tiket Internal jika aktivitas berasal dari tiket internal --}}
+                                    @if($act->category == 'Lain-lain' && $act->internalTicket)
+                                        <a href="{{ route('internal-tickets.show', $act->internalTicket->id) }}"
+                                           class="btn btn-outline-info" title="Lihat Tiket Internal">
+                                            <i class="fas fa-clipboard-check"></i>
+                                        </a>
+                                    @endif
+
                                     {{-- Info detail --}}
                                     <button type="button" class="btn btn-outline-info"
                                             data-bs-toggle="modal" data-bs-target="#detailModal{{ $act->id }}"
@@ -661,6 +669,19 @@
                                                             <a href="{{ route('tickets.show', $act->ticket->id) }}" class="btn btn-sm btn-danger">
                                                                 <i class="fas fa-external-link-alt me-1"></i>{{ $act->ticket->ticket_no }}
                                                             </a>
+                                                        </td>
+                                                    </tr>
+                                                    @endif
+                                                    @if($act->category == 'Lain-lain' && $act->internalTicket)
+                                                    <tr>
+                                                        <td>Tiket Internal</td>
+                                                        <td>
+                                                            <a href="{{ route('internal-tickets.show', $act->internalTicket->id) }}" class="btn btn-sm btn-info">
+                                                                <i class="fas fa-external-link-alt me-1"></i>{{ $act->internalTicket->ticket_no }}
+                                                            </a>
+                                                            @if($act->internalTicket->asset)
+                                                                <div class="small text-muted mt-1">{{ $act->internalTicket->asset->name }}</div>
+                                                            @endif
                                                         </td>
                                                     </tr>
                                                     @endif

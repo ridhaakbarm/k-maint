@@ -419,13 +419,25 @@
                         </li>
                         @endif
 
-                        {{-- 2. TECHNICIAN PANEL: Admin & MTC --}}
-                        @if(Auth::user()->isAdmin() || Auth::user()->isMTC())
+                        {{-- 2. TECHNICIAN PANEL: Admin & Teknisi --}}
+                        @if(Auth::user()->isTechnician())
                         <li class="nav-header text-uppercase">Technician Panel</li>
+                        <li class="nav-item">
+                            <a href="http://192.168.2.100/k-maint/public/dashboard" class="nav-link">
+                                <i class="fas fa-user-clock nav-icon text-warning"></i>
+                                <p>Dashboard Teknisi</p>
+                            </a>
+                        </li>
                         <li class="nav-item">
                             <a href="{{ route('teknisi.dashboard') }}" class="nav-link {{ Route::is('teknisi.dashboard') ? 'active' : '' }}">
                                 <i class="fas fa-user-clock nav-icon text-warning"></i>
                                 <p>Input Aktivitas Harian</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('tickets.monitoring') }}" class="nav-link {{ Route::is('tickets.monitoring') ? 'active' : '' }}">
+                                <i class="fas fa-desktop nav-icon"></i>
+                                <p>Monitoring Tiket</p>
                             </a>
                         </li>
                         <li class="nav-item">
@@ -452,7 +464,7 @@
                         </li>
                         @php
                             $dept = strtolower(trim((string) Auth::user()->department));
-                            $canAccessInternalTickets = Auth::user()->isAdmin() || Auth::user()->isMTC() || in_array($dept, ['maintenance', 'engineering', 'mtc']);
+                            $canAccessInternalTickets = Auth::user()->isTechnician() || in_array($dept, ['maintenance', 'engineering', 'mtc']);
                         @endphp
                         @if($canAccessInternalTickets)
                         <li class="nav-item">
@@ -463,8 +475,8 @@
                         </li>
                         @endif
 
-                        {{-- 4. PREVENTIVE MAINTENANCE: Admin, MTC & Management --}}
-                        @if(Auth::user()->isAdmin() || Auth::user()->isMTC() || Auth::user()->isManager() || Auth::user()->isSPV())
+                        {{-- 4. PREVENTIVE MAINTENANCE: Admin, Teknisi & Management --}}
+                        @if(Auth::user()->isAdmin() || Auth::user()->isTechnician() || Auth::user()->isManager() || Auth::user()->isSPV())
                         <li class="nav-header text-uppercase">Preventive Maintenance</li>
                         <li class="nav-item">
                             <a href="{{ route('monitoring.pm') }}" class="nav-link {{ Route::is('monitoring.pm') ? 'active' : '' }}">
@@ -472,7 +484,7 @@
                                 <p>Monitoring PM</p>
                             </a>
                         </li>
-                        @if(Auth::user()->isAdmin() || Auth::user()->isMTC())
+                        @if(Auth::user()->isTechnician())
                         <li class="nav-item">
                             <a href="{{ route('pm.schedule.index') }}" class="nav-link {{ Route::is('pm.schedule.*') ? 'active' : '' }}">
                                 <i class="fas fa-calendar-check nav-icon"></i>

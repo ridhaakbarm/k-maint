@@ -92,40 +92,45 @@ class User extends Authenticatable
 
     // --- Roles Checking ---
 
+    private function normalizedRole(): string
+    {
+        return strtolower(trim((string) $this->role));
+    }
+
     public function isAdmin(): bool
 {
-    return $this->role === 'admin';
+    return $this->normalizedRole() === 'admin';
 }
 
 public function isGA(): bool
 {
-    return $this->role === 'ga';
+    return $this->normalizedRole() === 'ga';
 }
 
 public function isMTC(): bool
 {
-    return $this->role === 'mtc';
+    return in_array($this->normalizedRole(), ['mtc', 'teknisi', 'technician'], true);
 }
 
 // TAMBAHKAN DUA FUNGSI INI:
 public function isManager(): bool
 {
-    return $this->role === 'manager' || $this->role === 'admin'; // Admin juga dianggap manager
+    return $this->normalizedRole() === 'manager' || $this->isAdmin(); // Admin juga dianggap manager
 }
 
 public function isSPV(): bool
 {
-    return $this->role === 'spv' || $this->role === 'admin'; // Admin juga dianggap SPV
+    return $this->normalizedRole() === 'spv' || $this->isAdmin(); // Admin juga dianggap SPV
 }
 
 public function isTechnician(): bool
 {
-    return $this->role === 'mtc' || $this->role === 'admin'; // Admin juga boleh bertindak sebagai teknisi
+    return $this->isMTC() || $this->isAdmin(); // Admin juga boleh bertindak sebagai teknisi
 }
 
 public function isUser(): bool
 {
-    return $this->role === 'user';
+    return $this->normalizedRole() === 'user';
 }
 
     // --- Notifikasi Kustom ---

@@ -170,6 +170,25 @@ class InternalTicketController extends Controller
             'assigned_to_name' => $request->assigned_to_name ?: $internalTicket->assigned_to_name,
         ]);
 
+        $activity = TechnicianActivity::where('user_id', Auth::id())
+            ->where('category', 'Lain-lain')
+            ->where('reference_id', $internalTicket->id)
+            ->whereIn('status', ['running', 'paused'])
+            ->latest('start_time')
+            ->first();
+
+        if ($activity && $request->status === 'pending' && $activity->status === 'running') {
+            $activity->pause($request->note);
+        }
+
+        if ($activity && $request->status === 'onprogress' && $activity->status === 'paused') {
+            $activity->resume(now(), [
+                'by_user_id' => Auth::id(),
+                'by_user_name' => Auth::user()->name,
+                'note' => $request->note,
+            ]);
+        }
+
         $internalTicket->notes()->create([
             'user_id' => Auth::id(),
             'note' => $request->note,

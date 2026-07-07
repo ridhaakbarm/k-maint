@@ -46,6 +46,11 @@ class TechnicianActivity extends Model
         return $this->belongsTo(PmCheck::class, 'reference_id');
     }
 
+    public function internalTicket()
+    {
+        return $this->belongsTo(InternalTicket::class, 'reference_id');
+    }
+
     public function resumedFromActivity()
     {
         return $this->belongsTo(self::class, 'resumed_from_activity_id');

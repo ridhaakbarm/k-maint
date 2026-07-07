@@ -505,6 +505,7 @@ class MonitoringController extends Controller
         $roleType = $request->input('role_type', 'mtc'); // Default 'mtc' agar tampilan awal tidak berubah
 
         // CATATAN PENTING: Ubah array ini dengan role bos-bos yang ada di database-mu kawan!
+        $technicianRoles = ['mtc', 'MTC', 'teknisi', 'technician'];
         $bossRoles = ['spv', 'admin', 'manager', 'engineering'];
 
         if (empty($technicianId) || is_null($technicianId)) {
@@ -532,20 +533,28 @@ class MonitoringController extends Controller
         // 2. AMBIL DATA TECHNICIAN BERDASARKAN ROLE
         $techQuery = User::query();
         if ($roleType === 'mtc') {
-            $techQuery->where('role', 'mtc');
+            $techQuery->whereIn('role', $technicianRoles);
         }
         elseif ($roleType === 'management') {
             $techQuery->whereIn('role', $bossRoles);
         }
         else {
-            $techQuery->where(function ($q) use ($bossRoles) {
-                $q->where('role', 'mtc')->orWhereIn('role', $bossRoles);
+            $techQuery->where(function ($q) use ($technicianRoles, $bossRoles) {
+                $q->whereIn('role', $technicianRoles)->orWhereIn('role', $bossRoles);
             });
         }
         $technicians = $techQuery->orderBy('role')->orderBy('name')->get();
 
         // 3. QUERY ACTIVITIES
-        $query = TechnicianActivity::with(['user', 'ticket.asset', 'ticket.notes.user', 'resumedFromActivity', 'pmCheck.pmSchedule.asset'])
+        $query = TechnicianActivity::with([
+            'user',
+            'ticket.asset',
+            'ticket.notes.user',
+            'resumedFromActivity',
+            'pmCheck.pmSchedule.asset',
+            'internalTicket.asset',
+            'internalTicket.notes.user',
+        ])
             ->whereDate('start_time', '>=', $dateFrom)
             ->whereDate('start_time', '<=', $dateTo)
             ->orderBy('start_time', 'desc');
@@ -802,6 +811,7 @@ class MonitoringController extends Controller
         $roleType = $request->input('role_type', 'mtc');
 
         // SESUAIKAN ARRAY INI DENGAN ROLE BOS DI DATABASE KAMU YA KAWAN
+        $technicianRoles = ['mtc', 'MTC', 'teknisi', 'technician'];
         $bossRoles = ['spv', 'manager', 'engineering'];
 
         $dateFrom = $request->get('date_from', now()->toDateString());
@@ -823,19 +833,27 @@ class MonitoringController extends Controller
 
         $techQuery = User::query();
         if ($roleType === 'mtc') {
-            $techQuery->where('role', 'mtc');
+            $techQuery->whereIn('role', $technicianRoles);
         }
         elseif ($roleType === 'management') {
             $techQuery->whereIn('role', $bossRoles);
         }
         else {
-            $techQuery->where(function ($q) use ($bossRoles) {
-                $q->where('role', 'mtc')->orWhereIn('role', $bossRoles);
+            $techQuery->where(function ($q) use ($technicianRoles, $bossRoles) {
+                $q->whereIn('role', $technicianRoles)->orWhereIn('role', $bossRoles);
             });
         }
         $technicians = $techQuery->orderBy('role')->orderBy('name')->get();
 
-        $query = TechnicianActivity::with(['user', 'ticket.asset', 'ticket.notes.user', 'resumedFromActivity', 'pmCheck.pmSchedule.asset'])
+        $query = TechnicianActivity::with([
+            'user',
+            'ticket.asset',
+            'ticket.notes.user',
+            'resumedFromActivity',
+            'pmCheck.pmSchedule.asset',
+            'internalTicket.asset',
+            'internalTicket.notes.user',
+        ])
             ->whereDate('start_time', '>=', $dateFrom)
             ->whereDate('start_time', '<=', $dateTo)
             ->orderBy('start_time', 'desc');

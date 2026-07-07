@@ -218,6 +218,12 @@ class TechnicianActivityExport_Sheet2 implements \Maatwebsite\Excel\Concerns\Fro
                 $reference .= ' (' . $activity->ticket->asset->name . ')';
             }
         }
+        elseif ($activity->category == 'Lain-lain' && $activity->internalTicket) {
+            $reference = $activity->internalTicket->ticket_no;
+            if ($activity->internalTicket->asset) {
+                $reference .= ' (' . $activity->internalTicket->asset->name . ')';
+            }
+        }
 
         $duration = $activity->duration ?? 0;
         if ($activity->status === 'running') {
