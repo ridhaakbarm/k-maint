@@ -1,279 +1,206 @@
-# Export Excel Laporan Efektivitas Teknisi (Comprehensive)
+# Revisi Export Efektivitas Teknisi — Fokus PM Accuracy & Shift Analysis
 
-Membuat fitur export Excel yang komprehensif untuk mengukur efektivitas teknisi dari 3 aspek utama: PM (Preventive Maintenance), Tiket Breakdown, dan Tiket Internal + Aktivitas Lainnya. Export ini dirancang dari perspektif **manager** yang butuh data untuk perencanaan dan evaluasi kinerja tim.
+Revisi export Excel untuk memperbaiki akurasi data PM dan menambahkan analisis per shift. Berdasarkan temuan: teknisi bisa record 57 menit aktivitas PM tapi 0 item dicek, namun tetap dihitung "1 mesin dikerjakan" — ini misleading.
 
-## Background & Analisis Sistem Saat Ini
+## Root Cause Analysis
 
-Sistem sudah memiliki 3 export class dasar:
-- [TicketsExport.php](file:///c:/laragon/www/K-Maint/app/Exports/TicketsExport.php) — export data tiket mentah (25 kolom)
-- [PmExport.php](file:///c:/laragon/www/K-Maint/app/Exports/PmExport.php) — export detail PM check items (31 kolom)
-- [TechnicianActivityExport.php](file:///c:/laragon/www/K-Maint/app/Exports/TechnicianActivityExport.php) — monitoring aktivitas teknisi (6 sheets)
+### Bug: PM Machine Count yang Salah
 
-**Kekurangan export saat ini:**
-1. **PM Export** hanya menampilkan raw data item-per-item, **tidak ada summary per mesin, per teknisi, atau perhitungan durasi pengerjaan**
-2. **Ticket Export** tidak menampilkan **durasi pengerjaan, jumlah penjedaan, siapa saja yang mengerjakan, atau distribusi per teknisi**
-3. **Tidak ada export untuk Internal Ticket** sama sekali
-4. Semua export berdiri sendiri — **tidak ada satu laporan terpadu** yang bisa dibandingkan lintas aspek
+Pada implementasi saat ini di [ManagerReportExport.php](file:///c:/laragon/www/K-Maint/app/Exports/ManagerReportExport.php):
+
+```php
+// Line 240 — Sheet 3: Summary PM Teknisi
+$machineCount = $checks->pluck('pm_schedule_id')->filter()->unique()->count();
+```
+
+**Masalah:** Ini menghitung "jumlah mesin ditangani" berdasarkan `PmCheck` yang di-assign ke teknisi (`technician_id`). Tapi `technician_id` di `PmCheck` hanya menandai siapa yang **membuka** checklist PM, bukan siapa yang **benar-benar mengecek item**.
+
+**Skenario bermasalah:**
+1. Teknisi A buka PM → `PmCheck.technician_id = A`
+2. Teknisi A record `TechnicianActivity` (PM) → 57 menit
+3. Tapi Teknisi A **tidak mengisi condition** satu pun `PmCheckItem` → progress 0%
+4. Export tetap menghitung: **"Teknisi A: 1 mesin ditangani"** ❌
+
+**Sumber kebenaran yang seharusnya:** `PmCheckItem.checked_by_user_id` — ini mencatat siapa yang **benar-benar** mengecek per item (diset di [PmCheckController.php L358-359](file:///c:/laragon/www/K-Maint/app/Http/Controllers/PmCheckController.php#L358-L359)).
 
 ---
 
 ## Proposed Changes
 
-Kita akan membuat **1 file export baru** bernama `ManagerReportExport.php` yang menghasilkan **Excel multi-sheet** dengan data komprehensif. Export diakses via tombol baru di halaman monitoring.
+### Component 1: Export Class (Revisi)
+
+#### [MODIFY] [ManagerReportExport.php](file:///c:/laragon/www/K-Maint/app/Exports/ManagerReportExport.php)
 
 ---
 
-### Component 1: Export Class
+#### **Perubahan 1: Fix Data Source PM — Gunakan `PmCheckItem.checked_by_user_id`**
 
-#### [NEW] [ManagerReportExport.php](file:///c:/laragon/www/K-Maint/app/Exports/ManagerReportExport.php)
+Ubah **seluruh logika PM summary** dari berbasis `PmCheck.technician_id` menjadi berbasis `PmCheckItem.checked_by_user_id`:
 
-File export utama menggunakan `Maatwebsite\Excel` dengan `WithMultipleSheets`. Berisi **8 sheets**:
+| Sebelum (salah) | Sesudah (benar) |
+|---|---|
+| Mesin dikerjakan = `PmCheck WHERE technician_id = X` | Mesin dikerjakan = `PmCheckItem WHERE checked_by_user_id = X AND condition IS NOT NULL` → group by mesin via `pmCheck.pmSchedule.asset` |
+| Item selesai = semua `PmCheckItem` dari PmCheck milik teknisi | Item selesai = hanya `PmCheckItem WHERE checked_by_user_id = X` |
+| Durasi PM = `TechnicianActivity(PM)` per user | Durasi PM = tetap `TechnicianActivity(PM)` per user (ini sudah benar) |
 
----
-
-#### **Sheet 1: Ringkasan Eksekutif (Executive Summary)**
-Dashboard angka-angka penting untuk overview cepat.
-
-| Metrik | Sumber Data |
-|--------|-------------|
-| Total PM terjadwal vs selesai (periode filter) | `PmCheck` + `PmCheckItem` |
-| Total Tiket masuk vs ditutup | `Ticket` |
-| Total Tiket Internal masuk vs ditutup | `InternalTicket` |
-| Rata-rata response time tiket | `Ticket.created_at` vs `TechnicianActivity.start_time` |
-| Rata-rata durasi pengerjaan tiket | `TechnicianActivity` (category=Breakdown) |
-| Teknisi paling produktif (top 5) | Aggregasi semua aktivitas |
-| Total jam kerja tim (Net) | `TechnicianAttendance` |
-| Overall productivity % | Jam aktivitas / Jam hadir |
-
----
-
-#### **Sheet 2: Detail PM per Mesin (PM Machine Detail)**
-Data PM dikelompokkan per mesin dengan summary yang jelas.
-
-| Kolom | Sumber |
-|-------|--------|
-| Nama Mesin (Asset) | `PmSchedule.asset.name` |
-| Tipe Jadwal (weekly/daily/monthly) | `PmSchedule.schedule_type` |
-| PIC/Teknisi | `PmCheck.technician.name` |
-| Week Number | `PmCheck.week_number` |
-| Total Item Checklist | `COUNT(PmCheckItem)` |
-| Item Sudah Dicek | `PmCheckItem WHERE condition IS NOT NULL` |
-| Item Belum Dicek | Selisih total - dicek |
-| Item Bermasalah (NOT OK) | `PmCheckItem WHERE condition NOT IN ('ok','baik','normal')` |
-| Item Butuh Follow Up | `PmCheckItem WHERE next_action IS NOT NULL` |
-| Progress (%) | (Dicek / Total) × 100 |
-| Tanggal Mulai Pengerjaan | `TechnicianActivity.start_time` (category=PM, reference_id=pm_check_id) |
-| Tanggal Selesai | `TechnicianActivity.end_time` |
-| Durasi Pengerjaan (menit) | `TechnicianActivity.duration` |
-| Durasi Pause Total (menit) | `TechnicianActivity.total_pause_minutes` |
-| Jumlah Pause | `TechnicianActivity.pause_count` |
-| Shift | `PmCheck.shift` |
-| Status PM | `PmCheck.status` |
-
----
-
-#### **Sheet 3: Ringkasan PM per Teknisi (PM Technician Summary)**
-Agregasi performa PM per teknisi — **berapa banyak mesin dan item yang dia kerjakan**.
-
-| Kolom | Kalkulasi |
-|-------|-----------|
-| Nama Teknisi | `User.name` |
-| Jumlah Mesin Ditangani | `COUNT(DISTINCT PmCheck.pm_schedule_id)` per teknisi |
-| Total Item Ditugaskan | `SUM(PmCheckItem)` semua PmCheck milik teknisi |
-| Total Item Selesai | Item dengan `condition IS NOT NULL` |
-| Total Item Belum | Selisih |
-| Progress (%) | Selesai / Total × 100 |
-| Total Durasi Pengerjaan PM (jam) | `SUM(TechnicianActivity.duration)` WHERE category=PM |
-| Rata-rata Item per Shift | Total item selesai / Jumlah hari kerja |
-| Rata-rata Durasi per Mesin (menit) | Total durasi / Jumlah mesin |
-| Item Bermasalah (NOT OK) | Count item bermasalah |
-| Item Follow Up | Count item dengan next_action |
-
----
-
-#### **Sheet 4: Detail Tiket Breakdown (Ticket Detail)**
-Data tiket lengkap dengan **metrik waktu & teknisi**.
-
-| Kolom | Sumber |
-|-------|--------|
-| No Tiket | `Ticket.ticket_no` |
-| Tanggal Masuk | `Ticket.request_date` |
-| Jam Masuk (Timestamp) | `Ticket.created_at` |
-| Mesin/Aset | `Ticket.asset.name` |
-| Subject | `Ticket.subject` |
-| Requester | `Ticket.requester.name` |
-| Department | `Ticket.requester.department` |
-| Status | `Ticket.status` |
-| Assigned To | `Ticket.assigned_to` |
-| GA PIC | `Ticket.ga_pic_name` |
-| MTC PIC | `Ticket.mtc_pic_name` |
-| Teknisi Yang Mengerjakan | `TechnicianActivity.user.name` (semua aktivitas Breakdown untuk tiket ini) |
-| Jumlah Teknisi | `COUNT(DISTINCT TechnicianActivity.user_id)` |
-| Response Time | `Ticket.created_at` → pertama kali `TechnicianActivity.start_time` |
-| Tanggal Mulai Dikerjakan | Pertama kali `TechnicianActivity.start_time` |
-| Tanggal Selesai | `Ticket.closed_date` |
-| Durasi Total Pengerjaan (menit) | `SUM(TechnicianActivity.duration)` semua sesi |
-| Durasi Total Pause (menit) | `SUM(TechnicianActivity.total_pause_minutes)` |
-| Jumlah Penjedaan | `SUM(TechnicianActivity.pause_count)` |
-| Jumlah Sesi Pengerjaan | `COUNT(TechnicianActivity)` untuk tiket ini |
-| Lead Time (jam) | `Ticket.created_at` → `Ticket.closed_date` (kalender) |
-| Problem Cause | `Ticket.problem_cause` |
-| Planned Date | `Ticket.planned_date` |
-| PR Number | `Ticket.pr_number` |
-
----
-
-#### **Sheet 5: Ringkasan Tiket per Teknisi (Ticket Technician Summary)**
-Performa penanganan tiket per teknisi.
-
-| Kolom | Kalkulasi |
-|-------|-----------|
-| Nama Teknisi | `User.name` |
-| Total Tiket Dikerjakan | `COUNT(DISTINCT reference_id)` di TechnicianActivity (Breakdown) |
-| Total Sesi Pengerjaan | `COUNT(TechnicianActivity)` per user (Breakdown) |
-| Total Durasi Pengerjaan (jam) | `SUM(duration)` |
-| Rata-rata Durasi per Tiket (menit) | Total durasi / jumlah tiket |
-| Total Penjedaan | `SUM(pause_count)` |
-| Total Durasi Pause (menit) | `SUM(total_pause_minutes)` |
-| Tiket Selesai (Closed) | Tiket dengan `status=closed` yang pernah dikerjakan |
-| Rata-rata Response Time (menit) | Rata-rata waktu dari tiket masuk → mulai dikerjakan |
-| Rata-rata Lead Time (jam) | Rata-rata waktu dari tiket masuk → tutup |
-
----
-
-#### **Sheet 6: Distribusi Tiket (Ticket Distribution)**
-Statistik distribusi tiket per bulan/status/department untuk perencanaan.
-
-| Kolom | Kalkulasi |
-|-------|-----------|
-| Bulan | Berdasarkan `request_date` |
-| Tiket Masuk | `COUNT(Ticket)` per bulan |
-| Tiket Closed | `COUNT WHERE status=closed` per bulan |
-| Tiket Open | `COUNT WHERE status=open` per bulan |
-| Tiket On Progress | `COUNT WHERE status=onprogress` per bulan |
-| Tiket Pending/Schedule | `COUNT WHERE status=schedule` per bulan |
-| Tiket Rejected | `COUNT WHERE status=rejected` per bulan |
-| Rate Penyelesaian (%) | Closed / Masuk × 100 |
-| Rata-rata Response Time (menit) | Per bulan |
-| Rata-rata Lead Time (jam) | Per bulan |
-
----
-
-#### **Sheet 7: Tiket Internal & Aktivitas Lainnya**
-Menampilkan semua tiket internal + aktivitas kategori "Lain-lain".
-
-| Kolom | Sumber |
-|-------|--------|
-| No Tiket Internal | `InternalTicket.ticket_no` |
-| Sumber (PM/Lisan) | `InternalTicket.source_type` |
-| Asal PM Item (jika ada) | `InternalTicket.pmCheckItem` |
-| Tanggal Masuk | `InternalTicket.request_date` |
-| Mesin/Aset | `InternalTicket.asset.name` |
-| Subject | `InternalTicket.subject` |
-| Deskripsi | `InternalTicket.description` |
-| Ditugaskan Ke | `InternalTicket.assigned_to_name` |
-| Prioritas | `InternalTicket.priority` |
-| Status | `InternalTicket.status` |
-| Target Date | `InternalTicket.target_date` |
-| Tanggal Mulai | `InternalTicket.started_at` |
-| Tanggal Selesai | `InternalTicket.closed_at` |
-| Durasi Pengerjaan (menit) | `TechnicianActivity` WHERE category='Lain-lain' AND reference_id=internal_ticket_id |
-| Hasil Pekerjaan | `InternalTicket.work_result` |
-| Requester | `InternalTicket.requester.name` |
-
----
-
-#### **Sheet 8: Scorecard Teknisi (Technician Scorecard)**
-**Satu baris per teknisi** — gabungan semua metrik dari PM, Tiket, dan Internal untuk penilaian menyeluruh.
-
-| Kolom | Sumber |
-|-------|--------|
-| Nama Teknisi | `User.name` |
-| Role | `User.role` |
-| Total Hari Hadir | `COUNT(TechnicianAttendance)` |
-| Total Jam Hadir (Net) | Dari clock_in/clock_out - istirahat |
-| Total Jam Aktivitas | `SUM(TechnicianActivity.duration)` semua kategori |
-| Produktivitas (%) | Jam Aktivitas / Jam Hadir × 100 |
-| — PM — | |
-| Mesin PM Ditangani | `COUNT(DISTINCT pm_schedule_id)` |
-| Item PM Selesai | Count |
-| Jam Kerja PM | `SUM(duration)` WHERE category=PM |
-| — Breakdown — | |
-| Tiket Ditangani | `COUNT(DISTINCT reference_id)` WHERE category=Breakdown |
-| Jam Kerja Breakdown | `SUM(duration)` WHERE category=Breakdown |
-| Rata-rata Response Time | Kalkulasi per teknisi |
-| — Lainnya — | |
-| Aktivitas Lain-lain | `COUNT` WHERE category=Lain-lain |
-| Jam Kerja Lainnya | `SUM(duration)` WHERE category=Lain-lain |
-| — Skor — | |
-| Distribusi PM (%) | Jam PM / Total Jam × 100 |
-| Distribusi Breakdown (%) | Jam Breakdown / Total Jam × 100 |
-| Distribusi Lainnya (%) | Jam Lainnya / Total Jam × 100 |
-| Rating Performance | Excellent/Good/Fair/Poor berdasarkan produktivitas |
-
----
-
-### Component 2: Controller
-
-#### [MODIFY] [ExportController.php](file:///c:/laragon/www/K-Maint/app/Http/Controllers/ExportController.php)
-
-Tambahkan method baru `exportManagerReport()`:
-- Menerima filter: `start_date`, `end_date`, `technician_id` (opsional, default semua)
-- Mengambil semua data terkait dan meneruskan ke `ManagerReportExport`
-- Generate filename: `Laporan_Efektivitas_Teknisi_{start_date}_sd_{end_date}.xlsx`
-
----
-
-### Component 3: Route
-
-#### [MODIFY] [web.php](file:///c:/laragon/www/K-Maint/routes/web.php)
-
-Tambahkan route baru di dalam group export:
+**Tambahan load data di `loadData()`:**
 ```php
-Route::get('/export/manager-report', [ExportController::class, 'exportManagerReport'])
-    ->name('export.manager-report');
+// Load semua PmCheckItem dengan checked_by_user_id untuk periode ini
+$this->pmCheckItems = PmCheckItem::with([
+    'pmCheck.pmSchedule.asset',
+    'checklistTemplate',
+    'checkedBy',
+])
+->whereHas('pmCheck', function ($q) {
+    $q->whereBetween('check_date', [$this->startDate, $this->endDate])
+      ->orWhere(function ($fallback) {
+          $fallback->whereNull('check_date')
+              ->whereBetween('due_date', [$this->startDate, $this->endDate]);
+      });
+})
+->get();
 ```
 
 ---
 
-### Component 4: UI Button
+#### **Perubahan 2: Hapus Kolom PIC PM di Semua Sheet**
 
-#### [MODIFY] Blade monitoring view
+| Sheet | Kolom Dihapus |
+|---|---|
+| Sheet 2 (Detail PM Mesin) | Hapus kolom `PIC/Teknisi` (dari `PmCheck.technician.name`) |
+| Sheet 8 (Scorecard) | Tidak ada kolom PIC, sudah oke |
 
-Tambahkan tombol "📊 Export Laporan Efektivitas" di halaman monitoring team (`monitoring/team.blade.php`) dan PM monitoring (`monitoring/pm.blade.php`), dengan filter tanggal dan teknisi.
+**Ganti** kolom `PIC/Teknisi` dengan `Dikerjakan Oleh` → daftar nama unik dari `PmCheckItem.checked_by_user_id` per PmCheck.
 
 ---
 
-## Open Questions
+#### **Perubahan 3: Tambah Kolom Efektivitas PM di Sheet 2 & 3**
 
-> [!IMPORTANT]
-> **Filter Tanggal Default**: Apakah default filter pakai **bulan ini** (1 Juli - 31 Juli 2026) atau **custom range**? Saya rencanakan default = bulan berjalan, tapi tetap bisa diubah.
+**Sheet 2 (Detail PM Mesin)** — Tambah kolom baru:
 
-> [!IMPORTANT]
-> **Akses Export**: Apakah fitur export ini hanya untuk role `admin` dan `manager`, atau boleh diakses `spv` juga?
+| Kolom Baru | Kalkulasi | Tujuan |
+|---|---|---|
+| Efektivitas | `(Item Dicek / Durasi Menit)` × 60 = "item/jam" | Berapa item per jam — semakin tinggi semakin efektif |
+| Flag Efektivitas | `Efektif` jika progress ≥ 50% DAN durasi > 0, `Tidak Efektif` jika durasi > 0 tapi progress = 0%, `Belum Dikerjakan` jika durasi = 0 | Quick glance untuk manager |
+| Dikerjakan Oleh | Nama-nama unik dari `PmCheckItem.checked_by_user_id` | Siapa yang benar-benar ngecek |
 
-> [!IMPORTANT]
-> **Halaman Trigger**: Mau tombol export-nya ditaruh di halaman mana? Opsi:
-> 1. Halaman Monitoring Team saja (sudah ada filter periode)
-> 2. Halaman baru khusus export/reporting
-> 3. Di semua halaman monitoring (team + PM)
+**Sheet 3 (Summary PM Teknisi)** — Revisi + tambah kolom:
+
+| Kolom | Perubahan |
+|---|---|
+| ~~Jumlah Mesin Ditangani~~ → `Mesin Benar-Benar Dicek` | Hitung hanya mesin di mana teknisi punya `PmCheckItem.checked_by_user_id = X AND condition IS NOT NULL` |
+| ~~Total Item Ditugaskan~~ (HAPUS) | Tidak relevan karena semua orang bisa kerjakan semua PM |
+| Total Item Dicek | `COUNT(PmCheckItem WHERE checked_by_user_id = X AND condition IS NOT NULL)` |
+| Item OK | `WHERE condition IN ('ok','baik','normal')` |
+| Item Bermasalah | `WHERE condition NOT IN ('ok','baik','normal')` |
+| Durasi Total PM (jam) | Dari `TechnicianActivity(PM)` |
+| Efektivitas (item/jam) | `Item Dicek / (Durasi / 60)` |
+| Mesin Tanpa Progress | Mesin di mana teknisi record aktivitas PM tapi 0 item dicek |
+| Rata-rata Item per Hari Kerja | `Item dicek / jumlah hari hadir` |
+
+---
+
+#### **Perubahan 4: Sheet Baru — Distribusi Per Shift**
+
+Tambah **Sheet 9: "Distribusi per Shift"** — menampilkan breakdown waktu per shift.
+
+**Data source:**
+- `TechnicianAttendance.shift` → menandai shift saat teknisi clock-in
+- `TechnicianActivity.start_time` → match dengan tanggal attendance untuk menentukan shift hari itu
+- Join: `TechnicianActivity.user_id + DATE(start_time)` ↔ `TechnicianAttendance.user_id + date`
+
+**Tabel utama (per baris = 1 shift group):**
+
+| Kolom | Sumber |
+|---|---|
+| Shift | `TechnicianAttendance.shift` (1/2/3) |
+| Total Hari | Jumlah attendance record per shift |
+| Total Teknisi (unik) | `COUNT(DISTINCT user_id)` per shift |
+| Total Jam Aktivitas | `SUM(TechnicianActivity.duration)` per shift |
+| Jam PM | `SUM(duration) WHERE category = PM` per shift |
+| Jam Breakdown | `SUM(duration) WHERE category = Breakdown` per shift |
+| Jam Lain-lain | `SUM(duration) WHERE category = Lain-lain` per shift |
+| % PM | `Jam PM / Total Jam × 100` |
+| % Breakdown | `Jam Breakdown / Total Jam × 100` |
+| % Lain-lain | `Jam Lain-lain / Total Jam × 100` |
+| Rata-rata Jam per Hari | `Total Jam / Total Hari` |
+| Item PM Dicek per Shift | Jumlah `PmCheckItem WHERE checked_at` jatuh di shift |
+
+**Sub-tabel (per baris = 1 teknisi per shift):**
+
+| Kolom | Sumber |
+|---|---|
+| Nama Teknisi | `User.name` |
+| Shift | Dari attendance |
+| Hari Masuk Shift Ini | `COUNT(TechnicianAttendance WHERE shift = X)` |
+| Jam PM | SUM durasi PM |
+| Jam Breakdown | SUM durasi Breakdown |
+| Jam Lain-lain | SUM durasi Lain-lain |
+| Total Jam | Sum semua |
+| Item PM Dicek | Count items checked |
+| Produktivitas (%) | Jam Aktivitas / Jam Hadir × 100 |
+
+---
+
+#### **Perubahan 5: Update Sheet 1 (Executive Summary)**
+
+Tambah baris baru di summary:
+
+| Metrik Baru | Kalkulasi |
+|---|---|
+| Total Mesin PM Benar-Benar Dicek | Mesin dengan ≥1 item checked |
+| Total Mesin PM Tanpa Progress | Mesin dengan activity record tapi 0 item checked |
+| Shift Paling Produktif | Shift dengan rata-rata jam aktivitas/hari tertinggi |
+| Shift dengan PM Terbanyak | Shift dengan total item PM dicek terbanyak |
+
+---
+
+#### **Perubahan 6: Update Sheet 8 (Scorecard Teknisi)**
+
+| Kolom | Perubahan |
+|---|---|
+| ~~Mesin PM Ditangani~~ → `Mesin PM Benar Dicek` | Hanya hitung mesin dengan ≥1 item checked |
+| ~~Item PM Selesai~~ → `Item PM Dicek` | Hanya dari `checked_by_user_id` |
+| (BARU) `Efektivitas PM (item/jam)` | Item dicek / jam PM |
+| (BARU) `Shift Utama` | Shift yang paling sering dipakai teknisi ini |
+
+---
+
+### Ringkasan Semua Perubahan per Sheet
+
+| Sheet | Aksi |
+|---|---|
+| 1. Ringkasan Eksekutif | **UPDATE** — tambah metrik PM akurat + shift paling produktif |
+| 2. Detail PM Mesin | **UPDATE** — hapus PIC, tambah Dikerjakan Oleh, Flag Efektivitas |
+| 3. Summary PM Teknisi | **OVERHAUL** — ganti basis dari `technician_id` ke `checked_by_user_id` |
+| 4. Detail Tiket Breakdown | Tidak berubah |
+| 5. Summary Tiket Teknisi | Tidak berubah |
+| 6. Distribusi Tiket | Tidak berubah |
+| 7. Internal dan Lainnya | Tidak berubah |
+| 8. Scorecard Teknisi | **UPDATE** — fix PM metrics + tambah shift utama |
+| 9. Distribusi per Shift | **NEW** — analisis waktu per shift |
 
 ---
 
 ## Verification Plan
 
+### Manual Verification
+1. **Test case kritis**: Temukan teknisi dengan `TechnicianActivity(PM)` tapi 0 `PmCheckItem.condition` → verifikasi export menampilkan:
+   - `Mesin Benar Dicek = 0` (bukan 1)
+   - `Flag = Tidak Efektif`
+   - `Item Dicek = 0`
+   - `Efektivitas = 0 item/jam`
+2. **Test PIC dihapus**: Pastikan tidak ada kolom PIC PM di sheet manapun
+3. **Test shift analysis**: Verifikasi Sheet 9 menampilkan breakdown per Shift 1/2/3 yang benar
+4. **Cross-check**: Bandingkan angka di Sheet 9 (shift) dengan Sheet 8 (scorecard) — total harus cocok
+
 ### Automated Tests
 ```bash
 php artisan tinker --execute="
-  \$export = new \App\Exports\ManagerReportExport(now()->startOfMonth()->toDateString(), now()->endOfMonth()->toDateString());
-  echo 'Sheets count: ' . count(\$export->sheets());
+  // Cek bahwa ada PmCheckItem dengan checked_by_user_id
+  echo 'Items with checker: ' . \App\Models\PmCheckItem::whereNotNull('checked_by_user_id')->count();
+  echo PHP_EOL;
+  // Cek shift data
+  echo 'Attendance with shift: ' . \App\Models\TechnicianAttendance::whereNotNull('shift')->count();
 "
 ```
-
-### Manual Verification
-1. Akses route `/export/manager-report?start_date=2026-07-01&end_date=2026-07-31`
-2. Buka file Excel yang terdownload
-3. Verifikasi setiap sheet memiliki data yang benar
-4. Cross-check angka summary dengan data di dashboard monitoring
-5. Test dengan filter teknisi spesifik
-6. Test dengan rentang tanggal berbeda (harian, mingguan, bulanan)

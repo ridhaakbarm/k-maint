@@ -4,6 +4,7 @@ namespace App\Exports;
 
 use App\Models\InternalTicket;
 use App\Models\PmCheck;
+use App\Models\PmCheckItem;
 use App\Models\TechnicianActivity;
 use App\Models\TechnicianAttendance;
 use App\Models\Ticket;
@@ -28,6 +29,7 @@ class ManagerReportExport implements WithMultipleSheets
     protected Collection $technicians;
     protected Collection $activities;
     protected Collection $pmChecks;
+    protected Collection $pmCheckItems;
     protected Collection $tickets;
     protected Collection $internalTickets;
     protected Collection $attendances;
@@ -52,6 +54,7 @@ class ManagerReportExport implements WithMultipleSheets
             new ManagerReportSheet('Distribusi Tiket', $this->ticketDistributionHeadings(), $this->ticketDistributionRows()),
             new ManagerReportSheet('Internal dan Lainnya', $this->internalHeadings(), $this->internalRows()),
             new ManagerReportSheet('Scorecard Teknisi', $this->scorecardHeadings(), $this->scorecardRows()),
+            new ManagerReportSheet('Distribusi per Shift', [], $this->shiftDistributionRows(), false),
         ];
     }
 
@@ -81,7 +84,7 @@ class ManagerReportExport implements WithMultipleSheets
             ->orderBy('start_time')
             ->get();
 
-        $this->pmChecks = PmCheck::with(['pmSchedule.asset', 'technician', 'checkItems'])
+        $this->pmChecks = PmCheck::with(['pmSchedule.asset', 'technician', 'checkItems.checkedBy'])
             ->where(function ($query) {
                 $query->whereBetween('check_date', [$this->startDate, $this->endDate])
                     ->orWhere(function ($fallback) {
@@ -89,7 +92,31 @@ class ManagerReportExport implements WithMultipleSheets
                             ->whereBetween('due_date', [$this->startDate, $this->endDate]);
                     });
             })
-            ->when($this->technicianId, fn($query) => $query->where('technician_id', $this->technicianId))
+            ->when($this->technicianId, function ($query) {
+                $pmActivityIds = $this->activities
+                    ->where('category', 'PM')
+                    ->pluck('reference_id')
+                    ->filter()
+                    ->unique();
+
+                $query->where(function ($filtered) use ($pmActivityIds) {
+                    $filtered->whereHas('checkItems', fn($items) => $items->where('checked_by_user_id', $this->technicianId));
+                    if ($pmActivityIds->isNotEmpty()) {
+                        $filtered->orWhereIn('id', $pmActivityIds);
+                    }
+                });
+            })
+            ->get();
+
+        $this->pmCheckItems = PmCheckItem::with(['pmCheck.pmSchedule.asset', 'checklistTemplate', 'checkedBy'])
+            ->whereHas('pmCheck', function ($query) {
+                $query->whereBetween('check_date', [$this->startDate, $this->endDate])
+                    ->orWhere(function ($fallback) {
+                        $fallback->whereNull('check_date')
+                            ->whereBetween('due_date', [$this->startDate, $this->endDate]);
+                    });
+            })
+            ->when($this->technicianId, fn($query) => $query->where('checked_by_user_id', $this->technicianId))
             ->get();
 
         $ticketIdsFromActivities = $this->activities
@@ -143,6 +170,17 @@ class ManagerReportExport implements WithMultipleSheets
         $totalAttendanceHours = $this->attendanceHours($this->attendances);
         $totalActivityHours = round($this->activities->sum(fn($activity) => $this->activityMinutes($activity)) / 60, 2);
         $productivity = $totalAttendanceHours > 0 ? round(($totalActivityHours / $totalAttendanceHours) * 100, 2) : 0;
+        $checkedPmItems = $this->checkedPmItems();
+        $pmChecksWithActivity = $this->activities->where('category', 'PM')->pluck('reference_id')->filter()->unique();
+        $pmChecksWithProgress = $checkedPmItems->pluck('pm_check_id')->filter()->unique();
+        $pmChecksWithoutProgress = $pmChecksWithActivity->diff($pmChecksWithProgress);
+        $shiftSummary = $this->shiftSummaryData();
+        $mostProductiveShift = $shiftSummary
+            ->sortByDesc(fn($row) => $row['avg_hours_per_day'])
+            ->first();
+        $mostPmShift = $shiftSummary
+            ->sortByDesc(fn($row) => $row['pm_items'])
+            ->first();
 
         $rows = [
             ['LAPORAN EFEKTIVITAS TEKNISI'],
@@ -162,6 +200,10 @@ class ManagerReportExport implements WithMultipleSheets
             ['Total Jam Kerja Tim (Net)', $totalAttendanceHours],
             ['Total Jam Aktivitas', $totalActivityHours],
             ['Overall Productivity (%)', $productivity],
+            ['Total Mesin PM Benar-Benar Dicek', $checkedPmItems->pluck('pmCheck.pm_schedule_id')->filter()->unique()->count()],
+            ['Total Mesin PM Tanpa Progress', $pmChecksWithoutProgress->count()],
+            ['Shift Paling Produktif', $mostProductiveShift ? 'Shift ' . $mostProductiveShift['shift'] : '-'],
+            ['Shift dengan PM Terbanyak', $mostPmShift ? 'Shift ' . $mostPmShift['shift'] : '-'],
             [],
             ['TOP 5 TEKNISI PRODUKTIF', 'Jam Aktivitas', 'Produktivitas (%)'],
         ];
@@ -176,10 +218,11 @@ class ManagerReportExport implements WithMultipleSheets
     protected function pmMachineHeadings(): array
     {
         return [
-            'Nama Mesin', 'Tipe Jadwal', 'PIC/Teknisi', 'Week Number', 'Total Item Checklist',
+            'Nama Mesin', 'Tipe Jadwal', 'Dikerjakan Oleh', 'Week Number', 'Total Item Checklist',
             'Item Sudah Dicek', 'Item Belum Dicek', 'Item Bermasalah', 'Item Butuh Follow Up',
             'Progress (%)', 'Tanggal Mulai Pengerjaan', 'Tanggal Selesai', 'Durasi Pengerjaan (menit)',
-            'Durasi Pause Total (menit)', 'Jumlah Pause', 'Shift', 'Status PM',
+            'Efektivitas (item/jam)', 'Flag Efektivitas', 'Durasi Pause Total (menit)', 'Jumlah Pause',
+            'Shift', 'Status PM',
         ];
     }
 
@@ -190,24 +233,34 @@ class ManagerReportExport implements WithMultipleSheets
         return $this->pmChecks->map(function ($check) use ($pmActivities) {
             $items = $check->checkItems;
             $checked = $items->filter(fn($item) => filled($item->condition))->count();
+            $checkedByNames = $items
+                ->filter(fn($item) => filled($item->condition) && filled($item->checked_by_user_id))
+                ->pluck('checkedBy.name')
+                ->filter()
+                ->unique()
+                ->implode(', ');
             $activities = $pmActivities->get($check->id) ?? collect();
             $firstActivity = $activities->sortBy('start_time')->first();
             $lastActivity = $activities->sortByDesc(fn($activity) => $activity->end_time ?: $activity->start_time)->first();
+            $duration = $activities->sum(fn($activity) => $this->activityMinutes($activity));
+            $progress = $items->count() > 0 ? round(($checked / $items->count()) * 100, 2) : 0;
 
             return [
                 optional(optional($check->pmSchedule)->asset)->name ?? '-',
                 optional($check->pmSchedule)->schedule_type ?? '-',
-                optional($check->technician)->name ?? $check->technician_name ?? '-',
+                $checkedByNames ?: '-',
                 $check->week_number ?? '-',
                 $items->count(),
                 $checked,
                 $items->count() - $checked,
                 $items->filter(fn($item) => $this->isNotOk($item->condition))->count(),
                 $items->filter(fn($item) => filled($item->next_action))->count(),
-                $items->count() > 0 ? round(($checked / $items->count()) * 100, 2) : 0,
+                $progress,
                 $this->formatDateTime(optional($firstActivity)->start_time),
                 $this->formatDateTime(optional($lastActivity)->end_time),
-                $activities->sum(fn($activity) => $this->activityMinutes($activity)),
+                $duration,
+                $duration > 0 ? round(($checked / $duration) * 60, 2) : 0,
+                $this->pmEffectivenessFlag($progress, $duration),
                 $activities->sum('total_pause_minutes'),
                 $activities->sum('pause_count'),
                 $check->shift ?? '-',
@@ -219,9 +272,9 @@ class ManagerReportExport implements WithMultipleSheets
     protected function pmTechnicianHeadings(): array
     {
         return [
-            'Nama Teknisi', 'Jumlah Mesin Ditangani', 'Total Item Ditugaskan', 'Total Item Selesai',
-            'Total Item Belum', 'Progress (%)', 'Total Durasi Pengerjaan PM (jam)',
-            'Rata-rata Item per Shift', 'Rata-rata Durasi per Mesin (menit)', 'Item Bermasalah', 'Item Follow Up',
+            'Nama Teknisi', 'Mesin Benar-Benar Dicek', 'Total Item Dicek', 'Item OK', 'Item Bermasalah',
+            'Durasi Total PM (jam)', 'Efektivitas (item/jam)', 'Mesin Tanpa Progress',
+            'Rata-rata Item per Hari Kerja', 'Item Follow Up',
         ];
     }
 
@@ -231,25 +284,26 @@ class ManagerReportExport implements WithMultipleSheets
         $attendanceByUser = $this->attendances->groupBy('user_id');
 
         return $this->technicians->map(function ($tech) use ($pmActivities, $attendanceByUser) {
-            $checks = $this->pmChecks->where('technician_id', $tech->id);
-            $items = $checks->flatMap->checkItems;
-            $done = $items->filter(fn($item) => filled($item->condition))->count();
-            $total = $items->count();
+            $items = $this->checkedPmItems()
+                ->where('checked_by_user_id', $tech->id)
+                ->filter(fn($item) => filled($item->condition));
             $duration = ($pmActivities->get($tech->id) ?? collect())->sum(fn($activity) => $this->activityMinutes($activity));
-            $shifts = max(1, ($attendanceByUser->get($tech->id) ?? collect())->count());
-            $machineCount = $checks->pluck('pm_schedule_id')->filter()->unique()->count();
+            $workDays = max(1, ($attendanceByUser->get($tech->id) ?? collect())->count());
+            $machineCount = $items->pluck('pmCheck.pm_schedule_id')->filter()->unique()->count();
+            $pmActivityCheckIds = ($pmActivities->get($tech->id) ?? collect())->pluck('reference_id')->filter()->unique();
+            $checkedCheckIds = $items->pluck('pm_check_id')->filter()->unique();
+            $withoutProgress = $pmActivityCheckIds->diff($checkedCheckIds)->count();
 
             return [
                 $tech->name,
                 $machineCount,
-                $total,
-                $done,
-                $total - $done,
-                $total > 0 ? round(($done / $total) * 100, 2) : 0,
-                round($duration / 60, 2),
-                round($done / $shifts, 2),
-                $machineCount > 0 ? round($duration / $machineCount, 2) : 0,
+                $items->count(),
+                $items->filter(fn($item) => $this->isOk($item->condition))->count(),
                 $items->filter(fn($item) => $this->isNotOk($item->condition))->count(),
+                round($duration / 60, 2),
+                $duration > 0 ? round(($items->count() / $duration) * 60, 2) : 0,
+                $withoutProgress,
+                round($items->count() / $workDays, 2),
                 $items->filter(fn($item) => filled($item->next_action))->count(),
             ];
         })->values();
@@ -418,8 +472,9 @@ class ManagerReportExport implements WithMultipleSheets
     {
         return [
             'Nama Teknisi', 'Role', 'Total Hari Hadir', 'Total Jam Hadir (Net)', 'Total Jam Aktivitas',
-            'Produktivitas (%)', 'Mesin PM Ditangani', 'Item PM Selesai', 'Jam Kerja PM', 'Tiket Ditangani',
-            'Jam Kerja Breakdown', 'Rata-rata Response Time (menit)', 'Aktivitas Lain-lain', 'Jam Kerja Lainnya',
+            'Produktivitas (%)', 'Mesin PM Benar Dicek', 'Item PM Dicek', 'Jam Kerja PM',
+            'Efektivitas PM (item/jam)', 'Shift Utama', 'Tiket Ditangani', 'Jam Kerja Breakdown',
+            'Rata-rata Response Time (menit)', 'Aktivitas Lain-lain', 'Jam Kerja Lainnya',
             'Distribusi PM (%)', 'Distribusi Breakdown (%)', 'Distribusi Lainnya (%)', 'Rating Performance',
         ];
     }
@@ -438,8 +493,14 @@ class ManagerReportExport implements WithMultipleSheets
             $pmMinutes = $activities->where('category', 'PM')->sum(fn($activity) => $this->activityMinutes($activity));
             $breakdownMinutes = $activities->where('category', 'Breakdown')->sum(fn($activity) => $this->activityMinutes($activity));
             $otherMinutes = $activities->where('category', 'Lain-lain')->sum(fn($activity) => $this->activityMinutes($activity));
-            $pmChecks = $this->pmChecks->where('technician_id', $tech->id);
+            $pmItems = $this->checkedPmItems()
+                ->where('checked_by_user_id', $tech->id)
+                ->filter(fn($item) => filled($item->condition));
             $breakdownTicketIds = $activities->where('category', 'Breakdown')->pluck('reference_id')->filter()->unique();
+            $mainShift = $attendance->groupBy('shift')
+                ->sortByDesc(fn($items) => $items->count())
+                ->keys()
+                ->first();
 
             return [
                 $tech->name,
@@ -448,9 +509,11 @@ class ManagerReportExport implements WithMultipleSheets
                 $attendanceHours,
                 $activityHours,
                 $productivity,
-                $pmChecks->pluck('pm_schedule_id')->filter()->unique()->count(),
-                $pmChecks->flatMap->checkItems->filter(fn($item) => filled($item->condition))->count(),
+                $pmItems->pluck('pmCheck.pm_schedule_id')->filter()->unique()->count(),
+                $pmItems->count(),
                 round($pmMinutes / 60, 2),
+                $pmMinutes > 0 ? round(($pmItems->count() / $pmMinutes) * 60, 2) : 0,
+                filled($mainShift) ? 'Shift ' . $mainShift : '-',
                 $breakdownTicketIds->count(),
                 round($breakdownMinutes / 60, 2),
                 $this->average($breakdownTicketIds->map(function ($ticketId) use ($activities, $ticketsById) {
@@ -466,6 +529,150 @@ class ManagerReportExport implements WithMultipleSheets
                 $this->rating($productivity),
             ];
         })->values();
+    }
+
+    protected function shiftDistributionRows(): array
+    {
+        $summary = $this->shiftSummaryData();
+        $rows = [
+            ['RINGKASAN DISTRIBUSI PER SHIFT'],
+            ['Shift', 'Total Hari', 'Total Teknisi Unik', 'Total Jam Aktivitas', 'Jam PM', 'Jam Breakdown', 'Jam Lain-lain', '% PM', '% Breakdown', '% Lain-lain', 'Rata-rata Jam per Hari', 'Item PM Dicek per Shift'],
+        ];
+
+        foreach ($summary as $row) {
+            $rows[] = [
+                'Shift ' . $row['shift'],
+                $row['days'],
+                $row['technicians'],
+                $row['total_hours'],
+                $row['pm_hours'],
+                $row['breakdown_hours'],
+                $row['other_hours'],
+                $row['pm_pct'],
+                $row['breakdown_pct'],
+                $row['other_pct'],
+                $row['avg_hours_per_day'],
+                $row['pm_items'],
+            ];
+        }
+
+        $rows[] = [];
+        $rows[] = ['DETAIL TEKNISI PER SHIFT'];
+        $rows[] = ['Nama Teknisi', 'Shift', 'Hari Masuk Shift Ini', 'Jam PM', 'Jam Breakdown', 'Jam Lain-lain', 'Total Jam', 'Item PM Dicek', 'Produktivitas (%)'];
+
+        foreach ($this->shiftTechnicianRows() as $row) {
+            $rows[] = $row;
+        }
+
+        return $rows;
+    }
+
+    protected function shiftSummaryData(): Collection
+    {
+        $attendanceByKey = $this->attendanceByUserDate();
+        $activitiesByShift = $this->activities->groupBy(fn($activity) => $this->shiftForActivity($activity, $attendanceByKey));
+        $itemsByShift = $this->checkedPmItems()->groupBy(fn($item) => $this->shiftForPmItem($item, $attendanceByKey));
+
+        return $this->attendances
+            ->whereNotNull('shift')
+            ->groupBy('shift')
+            ->map(function ($attendances, $shift) use ($activitiesByShift, $itemsByShift) {
+                $activities = $activitiesByShift->get((string) $shift, collect());
+                $totalMinutes = $activities->sum(fn($activity) => $this->activityMinutes($activity));
+                $pmMinutes = $activities->where('category', 'PM')->sum(fn($activity) => $this->activityMinutes($activity));
+                $breakdownMinutes = $activities->where('category', 'Breakdown')->sum(fn($activity) => $this->activityMinutes($activity));
+                $otherMinutes = $activities->where('category', 'Lain-lain')->sum(fn($activity) => $this->activityMinutes($activity));
+
+                return [
+                    'shift' => $shift,
+                    'days' => $attendances->count(),
+                    'technicians' => $attendances->pluck('user_id')->unique()->count(),
+                    'total_hours' => round($totalMinutes / 60, 2),
+                    'pm_hours' => round($pmMinutes / 60, 2),
+                    'breakdown_hours' => round($breakdownMinutes / 60, 2),
+                    'other_hours' => round($otherMinutes / 60, 2),
+                    'pm_pct' => $totalMinutes > 0 ? round(($pmMinutes / $totalMinutes) * 100, 2) : 0,
+                    'breakdown_pct' => $totalMinutes > 0 ? round(($breakdownMinutes / $totalMinutes) * 100, 2) : 0,
+                    'other_pct' => $totalMinutes > 0 ? round(($otherMinutes / $totalMinutes) * 100, 2) : 0,
+                    'avg_hours_per_day' => $attendances->count() > 0 ? round(($totalMinutes / 60) / $attendances->count(), 2) : 0,
+                    'pm_items' => ($itemsByShift->get((string) $shift, collect()))->count(),
+                ];
+            })
+            ->sortKeys()
+            ->values();
+    }
+
+    protected function shiftTechnicianRows(): array
+    {
+        $attendanceByKey = $this->attendanceByUserDate();
+        $activitiesByUserShift = $this->activities->groupBy(function ($activity) use ($attendanceByKey) {
+            return $activity->user_id . '|' . $this->shiftForActivity($activity, $attendanceByKey);
+        });
+        $itemsByUserShift = $this->checkedPmItems()->groupBy(function ($item) use ($attendanceByKey) {
+            return $item->checked_by_user_id . '|' . $this->shiftForPmItem($item, $attendanceByKey);
+        });
+
+        return $this->attendances
+            ->whereNotNull('shift')
+            ->groupBy(fn($attendance) => $attendance->user_id . '|' . $attendance->shift)
+            ->map(function ($attendances, $key) use ($activitiesByUserShift, $itemsByUserShift) {
+                [$userId, $shift] = explode('|', $key);
+                $activities = $activitiesByUserShift->get($key, collect());
+                $pmMinutes = $activities->where('category', 'PM')->sum(fn($activity) => $this->activityMinutes($activity));
+                $breakdownMinutes = $activities->where('category', 'Breakdown')->sum(fn($activity) => $this->activityMinutes($activity));
+                $otherMinutes = $activities->where('category', 'Lain-lain')->sum(fn($activity) => $this->activityMinutes($activity));
+                $totalMinutes = $pmMinutes + $breakdownMinutes + $otherMinutes;
+                $attendanceHours = $this->attendanceHours($attendances);
+
+                return [
+                    optional($attendances->first()->user)->name ?? User::find($userId)?->name ?? '-',
+                    'Shift ' . $shift,
+                    $attendances->count(),
+                    round($pmMinutes / 60, 2),
+                    round($breakdownMinutes / 60, 2),
+                    round($otherMinutes / 60, 2),
+                    round($totalMinutes / 60, 2),
+                    ($itemsByUserShift->get($key, collect()))->count(),
+                    $attendanceHours > 0 ? round((($totalMinutes / 60) / $attendanceHours) * 100, 2) : 0,
+                ];
+            })
+            ->sortBy(fn($row) => $row[1] . $row[0])
+            ->values()
+            ->all();
+    }
+
+    protected function checkedPmItems(): Collection
+    {
+        return $this->pmCheckItems
+            ->filter(fn($item) => filled($item->checked_by_user_id) && filled($item->condition))
+            ->values();
+    }
+
+    protected function attendanceByUserDate(): Collection
+    {
+        return $this->attendances->keyBy(function ($attendance) {
+            return $attendance->user_id . '|' . Carbon::parse($attendance->date)->toDateString();
+        });
+    }
+
+    protected function shiftForActivity(TechnicianActivity $activity, Collection $attendanceByKey): string
+    {
+        if (!$activity->start_time) {
+            return 'Tanpa Shift';
+        }
+
+        $key = $activity->user_id . '|' . $activity->start_time->toDateString();
+        return (string) optional($attendanceByKey->get($key))->shift ?: 'Tanpa Shift';
+    }
+
+    protected function shiftForPmItem(PmCheckItem $item, Collection $attendanceByKey): string
+    {
+        if (!$item->checked_at || !$item->checked_by_user_id) {
+            return 'Tanpa Shift';
+        }
+
+        $key = $item->checked_by_user_id . '|' . $item->checked_at->toDateString();
+        return (string) optional($attendanceByKey->get($key))->shift ?: 'Tanpa Shift';
     }
 
     protected function activityMinutes(TechnicianActivity $activity): int
@@ -503,7 +710,29 @@ class ManagerReportExport implements WithMultipleSheets
             return false;
         }
 
-        return !in_array(strtolower(trim((string) $condition)), ['ok', 'baik', 'normal'], true);
+        return !$this->isOk($condition);
+    }
+
+    protected function isOk($condition): bool
+    {
+        if (!filled($condition)) {
+            return false;
+        }
+
+        return in_array(strtolower(trim((string) $condition)), ['ok', 'baik', 'normal'], true);
+    }
+
+    protected function pmEffectivenessFlag(float $progress, int $duration): string
+    {
+        if ($duration <= 0) {
+            return 'Belum Dikerjakan';
+        }
+
+        if ($progress <= 0) {
+            return 'Tidak Efektif';
+        }
+
+        return $progress >= 50 ? 'Efektif' : 'Perlu Review';
     }
 
     protected function rating(float $productivity): string
