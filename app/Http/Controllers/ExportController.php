@@ -6,6 +6,7 @@ use App\Models\Ticket;
 use App\Models\PmSchedule;
 use App\Exports\TicketsExport;
 use App\Exports\PmExport;
+use App\Exports\ManagerReportExport;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Http\Request;
 
@@ -65,5 +66,35 @@ class ExportController extends Controller
         $filename = 'pm_export_' . $startDate . '_sd_' . $endDate . '_' . date('Y-m-d_H-i-s') . '.xlsx';
 
         return Excel::download(new PmExport($startDate, $endDate), $filename);
+    }
+
+    public function exportManagerReport(Request $request)
+    {
+        $user = $request->user();
+        if (!($user->isAdmin() || $user->isManager() || $user->isSPV())) {
+            abort(403, 'Akses export laporan efektivitas hanya untuk admin, manager, dan SPV.');
+        }
+
+        $validated = $request->validate([
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date',
+            'date_from' => 'nullable|date',
+            'date_to' => 'nullable|date|after_or_equal:date_from',
+            'technician_id' => 'nullable',
+            'technician' => 'nullable',
+        ]);
+
+        $startDate = $validated['start_date']
+            ?? $validated['date_from']
+            ?? now()->startOfMonth()->toDateString();
+        $endDate = $validated['end_date']
+            ?? $validated['date_to']
+            ?? now()->endOfMonth()->toDateString();
+        $technicianId = $validated['technician_id'] ?? $validated['technician'] ?? null;
+        $technicianId = in_array($technicianId, ['all', '', null], true) ? null : (int) $technicianId;
+
+        $filename = 'Laporan_Efektivitas_Teknisi_' . $startDate . '_sd_' . $endDate . '.xlsx';
+
+        return Excel::download(new ManagerReportExport($startDate, $endDate, $technicianId), $filename);
     }
 }

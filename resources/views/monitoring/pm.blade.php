@@ -9,9 +9,18 @@
             </h4>
             <small class="text-muted">Ringkasan kondisi Preventive Maintenance, progres checklist, dan performa teknisi.</small>
         </div>
-        <a href="{{ route('export.pm', ['start_date' => $dateFrom, 'end_date' => $dateTo]) }}" class="btn btn-success">
-            <i class="fas fa-file-excel me-1"></i> Export Detail PM
-        </a>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="{{ route('export.pm', ['start_date' => $dateFrom, 'end_date' => $dateTo]) }}" class="btn btn-success">
+                <i class="fas fa-file-excel me-1"></i> Export Detail PM
+            </a>
+            <a href="{{ route('export.manager-report', [
+                'date_from' => $dateFrom,
+                'date_to' => $dateTo,
+                'technician_id' => $technicianId
+            ]) }}" class="btn btn-primary">
+                <i class="fas fa-chart-bar me-1"></i> Export Laporan Efektivitas
+            </a>
+        </div>
     </div>
 
     <div class="card shadow-sm mb-4">

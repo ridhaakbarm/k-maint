@@ -19,6 +19,13 @@
 ]) }}" class="btn btn-success">
     <i class="fas fa-file-excel me-1"></i> Export Excel
 </a>
+            <a href="{{ route('export.manager-report', [
+    'date_from' => $dateFrom,
+    'date_to' => $dateTo,
+    'technician_id' => $technicianId
+]) }}" class="btn btn-primary">
+    <i class="fas fa-chart-bar me-1"></i> Export Laporan Efektivitas
+</a>
             <a href="{{ route('dashboard') }}" class="btn btn-outline-secondary">
                 <i class="fas fa-arrow-left me-1"></i> Kembali ke Dashboard
             </a>
