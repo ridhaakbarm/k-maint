@@ -1,0 +1,60 @@
+# Perbaikan Sistem K-Maint: PM Schedules, PM Checks, dan Monitoring Dashboard
+
+## Tujuan
+Memperbaiki kerancuan data pada sistem K-Maint sesuai permintaan:
+1. Menghapus keterikatan PIC pada semua jadwal PM (PM Schedules) agar semua teknisi bertanggung jawab.
+2. Menampilkan nama teknisi yang sudah memulai PM pada card jadwal di halaman PM Checks List.
+3. Memperjelas rincian target dan progres item PM (Bulanan, Mingguan, Harian) pada halaman Monitoring PM.
+
+## User Review Required
+- **Penghapusan PIC**: Kolom `pic_name` di database `pm_schedules` akan tetap ada agar data lama tidak hilang secara struktural (bisa juga dibuat nullable jika belum), namun seluruh inputan, tampilan tabel, dan card terkait PIC di aplikasi akan dihilangkan seluruhnya.
+- **Tampilan Monitoring PM**: Rincian Bulanan, Mingguan, dan Harian akan dihitung berdasarkan jadwal aktif (Schedules & Checklist Templates) vs aktual pengerjaan (Check Items) lalu ditampilkan pada kotak ringkasan khusus di atas dashboard monitoring. Apakah perhitungan target harian (hanya jadwal *daily*), mingguan (jadwal *weekly* minggu ini + *daily* 7 hari), bulanan (semua aktif di bulan ini) sesuai ekspektasi?
+
+## Proposed Changes
+
+### 1. Penghapusan PIC dari Jadwal PM
+Semua teknisi akan bisa mengerjakan PM, sehingga atribut PIC dihapus dari UI dan logika aplikasi.
+
+#### [MODIFY] app/Http/Controllers/PmScheduleController.php
+- Menghapus aturan validasi `pic_name` pada fungsi `store` dan `update`.
+- Menghapus pengisian `pic_name` saat `PmSchedule::create` dan `$pmSchedule->update`.
+
+#### [MODIFY] resources/views/pm-schedules/create.blade.php
+- Menghapus form input "PIC (Penanggung Jawab MTC)".
+
+#### [MODIFY] resources/views/pm-schedules/edit.blade.php
+- Menghapus form input "PIC (Penanggung Jawab MTC)".
+
+#### [MODIFY] resources/views/pm-schedules/index.blade.php
+- Menghapus kolom "PIC" dari header tabel.
+- Menghapus data PIC dari baris tabel.
+
+#### [MODIFY] resources/views/pm-checks/index.blade.php
+- Menghapus blok tampilan `PIC` pada setiap *card* PM.
+
+### 2. Penanda Teknisi pada Card PM (PM Checks)
+Jika PM sudah dimulai, kita perlu menampilkan siapa yang memulainya meskipun progresnya masih 0.
+
+#### [MODIFY] resources/views/pm-checks/index.blade.php
+- Menambahkan baris info `Mulai oleh: [Nama Teknisi]` pada *card* PM jika `$existingPmCheck` sudah ada. (Menggunakan properti `$existingPmCheck->technician_name`).
+
+### 3. Rincian PM Terjadwal di Monitoring Dashboard
+Memperjelas total item PM dan progresnya untuk Hari Ini, Minggu Ini, dan Bulan Ini.
+
+#### [MODIFY] app/Http/Controllers/MonitoringController.php
+- Pada fungsi `pmMonitoring()`, tambahkan perhitungan baru untuk:
+  - **Item Harian**: Target (dari jadwal *daily* yang aktif hari ini) dan Capaian (item *daily* yang *done* hari ini).
+  - **Item Mingguan**: Target (jadwal *daily* selama seminggu + jadwal *weekly* untuk minggu ini) dan Capaian (item yang dikerjakan minggu ini).
+  - **Item Bulanan**: Target (berdasarkan bulan dari rentang filter) dan Capaian.
+- Menyimpan hasil perhitungan ke variabel baru yang dilempar ke *view*.
+
+#### [MODIFY] resources/views/monitoring/pm.blade.php
+- Mengubah desain atau menambahkan blok *summary* baru (misalnya "Rincian Item PM") yang secara jelas menampilkan 3 metrik utama:
+  - **Bulan Ini**: Total Terjadwal (X item), Dikerjakan (Y item), Progres (Z%).
+  - **Minggu Berjalan**: Total Terjadwal (X item), Dikerjakan (Y item), Progres (Z%).
+  - **Hari Ini**: Total Terjadwal (X item), Dikerjakan (Y item), Progres (Z%).
+
+## Verification Plan
+1. Mengakses menu **PM Schedules** (tambah, edit, daftar) untuk memastikan tidak ada lagi form/kolom PIC, dan fitur simpan/update berjalan tanpa error.
+2. Mengakses menu **Daftar PM (PM Checks)** untuk memastikan card PM tidak memunculkan PIC, dan card yang sudah *in progress* memunculkan nama teknisi.
+3. Mengakses menu **Monitoring PM** untuk melihat kotak summary baru yang merincikan total item dan progres Harian, Mingguan, dan Bulanan, serta memastikan kalkulasinya masuk akal dan tidak menyebabkan lambatnya proses muat halaman.

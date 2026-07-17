@@ -44,7 +44,6 @@
                                 <th width="50">#</th>
                                 <th>Nama Mesin / Aset</th>
                                 <th>Tipe</th>
-                                <th>PIC</th>
                                 <th>Nama Jadwal</th>
                                 <th width="100" class="text-center">Status</th>
                                 <th width="150" class="text-center">Aksi</th>
@@ -66,13 +65,6 @@
                                         {{ strtoupper($schedule->schedule_type) }}
                                     </span>
                                 </td>
-                                <td>
-            @if($schedule->pic_name)
-                <div class="small fw-bold"><i class="fas fa-user-gear me-1 text-muted"></i>{{ $schedule->pic_name }}</div>
-            @else
-                <span class="text-muted small">-</span>
-            @endif
-        </td>
                                 <td>{{ str_replace('FA - ', '', $schedule->name) }}</td>
                                 <td class="text-center">
                                     <span class="badge rounded-pill bg-{{ $schedule->is_active ? 'success' : 'danger' }}">
@@ -98,7 +90,7 @@
                             </tr>
                             @empty
                             <tr>
-                                <td colspan="7" class="text-center py-5 text-muted italic">
+                                <td colspan="6" class="text-center py-5 text-muted italic">
                                     <i class="fas fa-calendar-times fa-2x mb-3 d-block"></i>
                                     Belum ada jadwal PM yang terdaftar.
                                 </td>

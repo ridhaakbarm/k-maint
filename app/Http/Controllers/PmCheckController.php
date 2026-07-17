@@ -49,8 +49,7 @@ class PmCheckController extends Controller
         if ($search) {
             $schedulesQuery->whereHas('asset', function($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%");
-            })
-            ->orWhere('pic_name', 'like', "%{$search}%");
+            });
         }
 
         $schedules = $schedulesQuery->get();

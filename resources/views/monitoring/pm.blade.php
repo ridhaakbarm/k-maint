@@ -102,6 +102,48 @@
         @endforeach
     </div>
 
+    <div class="card shadow-sm mb-4 border-info">
+        <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
+            <span><i class="fas fa-tasks me-2 text-info"></i>Rincian Item PM</span>
+            <small class="text-muted">Target item terjadwal vs item dikerjakan</small>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                @foreach([
+                    ['title' => 'Bulan Ini', 'key' => 'monthly', 'class' => 'primary', 'note' => 'Semua jadwal aktif bulan ini'],
+                    ['title' => 'Minggu Berjalan', 'key' => 'weekly', 'class' => 'success', 'note' => 'Daily 7 hari + weekly minggu ini'],
+                    ['title' => 'Hari Ini', 'key' => 'daily', 'class' => 'dark', 'note' => 'Jadwal daily aktif hari ini'],
+                ] as $summaryCard)
+                    @php
+                        $summary = $pmItemPeriodSummary[$summaryCard['key']] ?? ['target' => 0, 'done' => 0, 'progress' => 0];
+                    @endphp
+                    <div class="col-lg-4">
+                        <div class="pm-item-summary-box border-{{ $summaryCard['class'] }}">
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <div>
+                                    <div class="text-muted small fw-bold text-uppercase">{{ $summaryCard['title'] }}</div>
+                                    <div class="small text-muted">{{ $summaryCard['note'] }}</div>
+                                </div>
+                                <span class="badge bg-{{ $summaryCard['class'] }}">{{ $summary['progress'] }}%</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>Total Terjadwal</span>
+                                <strong>{{ $summary['target'] }} item</strong>
+                            </div>
+                            <div class="d-flex justify-content-between mb-3">
+                                <span>Dikerjakan</span>
+                                <strong class="text-{{ $summaryCard['class'] }}">{{ $summary['done'] }} item</strong>
+                            </div>
+                            <div class="progress" style="height: 10px;">
+                                <div class="progress-bar bg-{{ $summaryCard['class'] }}" style="width: {{ min($summary['progress'], 100) }}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    </div>
+
     <div class="card shadow-sm mb-4 border-primary">
         <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
             <span><i class="fas fa-calendar-day me-2 text-primary"></i>Planning PM Hari Ini & Bulan Berjalan</span>
@@ -312,6 +354,14 @@
         background: #fff;
         border-radius: 6px;
         padding: 14px 16px;
+        height: 100%;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+    .pm-item-summary-box {
+        border-left: 4px solid;
+        background: #fff;
+        border-radius: 6px;
+        padding: 16px;
         height: 100%;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
     }

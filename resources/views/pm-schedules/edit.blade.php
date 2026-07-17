@@ -44,23 +44,6 @@
                             @endforeach
                         </select>
                     </div>
-                    {{-- INPUT PIC BARU DI HALAMAN EDIT KAWAN --}}
-<div class="mb-3">
-    <label for="pic_name" class="form-label fw-bold">PIC (Penanggung Jawab MTC)</label>
-    <select class="form-select select2 @error('pic_name') is-invalid @enderror" 
-            id="pic_name" name="pic_name">
-        <option value="">-- Pilih PIC (Opsional) --</option>
-        @foreach($technicians as $tech)
-            <option value="{{ $tech->name }}" 
-                {{ (old('pic_name', $pmSchedule->pic_name) == $tech->name) ? 'selected' : '' }}>
-                {{ $tech->name }} ({{ $tech->department }})
-            </option>
-        @endforeach
-    </select>
-    @error('pic_name') <div class="invalid-feedback">{{ $message }}</div> @enderror
-    <small class="text-muted">Teknisi ini yang akan bertanggung jawab rutin atas mesin ini kawan.</small>
-</div>
-
                     <div class="form-check mt-4">
                         <input class="form-check-input" type="checkbox" 
                                id="is_active" name="is_active" value="1" 
@@ -79,18 +62,4 @@
     </div>
 </div>
 
-@push('scripts')
-<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-<script>
-$(document).ready(function() {
-    $('.select2').select2({
-        theme: 'bootstrap-5',
-        width: '100%',
-        placeholder: '-- Pilih PIC (Opsional) --',
-        allowClear: true
-    });
-});
-</script>
-@endpush
 @endsection

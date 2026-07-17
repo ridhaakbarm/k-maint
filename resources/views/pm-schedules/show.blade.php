@@ -59,16 +59,6 @@
                         </td>
                     </tr>
                     <tr>
-            <th class="bg-light">PIC Penanggung Jawab</th>
-            <td>
-                @if($pmSchedule->pic_name)
-                    <strong class="text-dark"><i class="fas fa-user-shield me-2 text-primary"></i>{{ $pmSchedule->pic_name }}</strong>
-                @else
-                    <span class="text-muted italic">Belum ditentukan kawan.</span>
-                @endif
-            </td>
-        </tr>
-                    <tr>
                         <th class="bg-light">Nama Jadwal</th>
                         <td>{{ str_replace('FA - ', '', $pmSchedule->name) }}</td>
                     </tr>

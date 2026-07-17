@@ -111,12 +111,6 @@
                                             {{ $activeItemCount }} Items
                                         </span>
                                     </div>
-                                    @if($schedule->pic_name)
-                                    <div class="mb-2">
-                                        <small class="text-muted"><i class="fas fa-user me-1"></i> PIC:</small>
-                                        <strong class="text-info">{{ $schedule->pic_name }}</strong>
-                                    </div>
-                                    @endif
                                     <div class="bg-light p-2 rounded small text-center">
                                         Status: <strong>{{ $assignment ? strtoupper(str_replace('_', ' ', $assignment->status)) : 'READY TO CHECK' }}</strong>
                                     </div>
@@ -144,6 +138,10 @@
                                         </div>
 
                                         @if($existingPmCheck)
+                                            <div class="mb-2 text-center small text-muted">
+                                                <i class="fas fa-user-check me-1"></i>
+                                                Mulai oleh: <strong>{{ $existingPmCheck->technician_name ?? '-' }}</strong>
+                                            </div>
                                             {{-- JIKA SUDAH ADA PM CHECK: Tampilkan tombol LIHAT/DETAIL --}}
                                             <a href="{{ route('pm.execution.show', $existingPmCheck->id) }}" class="btn btn-info btn-sm w-100 fw-bold">
                                                 <i class="fas fa-eye me-1"></i> LIHAT CHECKLIST WEEK {{ $currentWeek }}

@@ -283,6 +283,24 @@ class MonitoringController extends Controller
             'progress' => $totalItems > 0 ? round(($doneItems / $totalItems) * 100, 1) : 0,
         ];
 
+        $pmItemPeriodSummary = [
+            'monthly' => $this->pmItemProgressSummary(
+                Carbon::parse($dateFrom)->copy()->startOfMonth(),
+                Carbon::parse($dateFrom)->copy()->endOfMonth(),
+                ['daily', 'weekly', 'yearly']
+            ),
+            'weekly' => $this->pmItemProgressSummary(
+                now()->copy()->startOfWeek(),
+                now()->copy()->endOfWeek(),
+                ['daily', 'weekly']
+            ),
+            'daily' => $this->pmItemProgressSummary(
+                now()->copy()->startOfDay(),
+                now()->copy()->endOfDay(),
+                ['daily']
+            ),
+        ];
+
         $monthReference = Carbon::parse($dateFrom);
         $monthWeeks = collect(range(0, $monthReference->daysInMonth - 1))
             ->map(fn($offset) => $monthReference->copy()->startOfMonth()->addDays($offset)->weekOfYear)
@@ -422,6 +440,7 @@ class MonitoringController extends Controller
             'technicians',
             'statusSummary',
             'activeMonthSchedules',
+            'pmItemPeriodSummary',
             'todaySummary',
             'followUpSummary',
             'scheduleTypeSummary',
@@ -430,6 +449,66 @@ class MonitoringController extends Controller
             'needVerificationChecks',
             'recentFinishedChecks'
         ));
+    }
+
+    protected function pmItemProgressSummary(Carbon $startDate, Carbon $endDate, array $scheduleTypes): array
+    {
+        $start = $startDate->copy()->startOfDay();
+        $end = $endDate->copy()->endOfDay();
+        $dateFrom = $start->toDateString();
+        $dateTo = $end->toDateString();
+        $daysInPeriod = $start->diffInDays($end) + 1;
+        $weeksInPeriod = collect(range(0, $daysInPeriod - 1))
+            ->map(fn($offset) => (int) $start->copy()->addDays($offset)->weekOfYear)
+            ->unique()
+            ->values();
+
+        $schedules = PmSchedule::with(['checklistTemplates' => fn($q) => $q->where('is_active', true)])
+            ->where('is_active', true)
+            ->whereIn('schedule_type', $scheduleTypes)
+            ->get();
+
+        $targetItems = $schedules->sum(function ($schedule) use ($daysInPeriod, $weeksInPeriod) {
+            if ($schedule->schedule_type === 'daily') {
+                return $schedule->checklistTemplates->count() * $daysInPeriod;
+            }
+
+            return $weeksInPeriod->sum(function ($weekNumber) use ($schedule) {
+                return $schedule->checklistTemplates
+                    ->filter(fn($template) => $this->templateActiveInWeek($template, $weekNumber))
+                    ->count();
+            });
+        });
+
+        $doneItems = PmCheckItem::whereNotNull('condition')
+            ->where('condition', '!=', '')
+            ->whereHas('pmCheck', function ($query) use ($dateFrom, $dateTo, $scheduleTypes) {
+                $query->where(function ($dateQuery) use ($dateFrom, $dateTo) {
+                    $dateQuery->whereBetween('check_date', [$dateFrom, $dateTo])
+                        ->orWhere(function ($fallback) use ($dateFrom, $dateTo) {
+                            $fallback->whereNull('check_date')
+                                ->whereBetween('due_date', [$dateFrom, $dateTo]);
+                        });
+                })
+                    ->whereHas('pmSchedule', fn($scheduleQuery) => $scheduleQuery->whereIn('schedule_type', $scheduleTypes));
+            })
+            ->count();
+
+        return [
+            'target' => $targetItems,
+            'done' => $doneItems,
+            'progress' => $targetItems > 0 ? round(($doneItems / $targetItems) * 100, 1) : 0,
+        ];
+    }
+
+    protected function templateActiveInWeek($template, int $weekNumber): bool
+    {
+        $activeWeeks = is_array($template->active_weeks)
+            ? $template->active_weeks
+            : json_decode($template->active_weeks, true);
+
+        return is_array($activeWeeks)
+            && (in_array($weekNumber, $activeWeeks) || in_array((string) $weekNumber, $activeWeeks));
     }
 
     protected function activePmSchedulesForWeek(int $weekNumber)

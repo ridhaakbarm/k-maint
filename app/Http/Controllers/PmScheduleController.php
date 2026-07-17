@@ -6,7 +6,6 @@ use App\Models\PmSchedule;
 use App\Models\Asset; // Gunakan Asset
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use App\Models\User;
 
 class PmScheduleController extends Controller
 {
@@ -33,22 +32,19 @@ class PmScheduleController extends Controller
         return view('pm-schedules.index', compact('pmSchedules', 'scheduleTypes'));
     }
 
-    public function create() {
-    $machines = Asset::orderBy('fa_code')->get();
-    
-    // Ambil user yang rolenya MTC kawan
-    $technicians = User::whereIn('role', ['mtc', 'MTC'])->orderBy('name')->get();
-    $scheduleTypes = $this->scheduleTypes();
-    
-    return view('pm-schedules.create', compact('machines', 'scheduleTypes', 'technicians'));
-}
+    public function create()
+    {
+        $machines = Asset::orderBy('fa_code')->get();
+        $scheduleTypes = $this->scheduleTypes();
+
+        return view('pm-schedules.create', compact('machines', 'scheduleTypes'));
+    }
 
     public function store(Request $request)
     {
         $request->validate([
             'asset_id' => 'required|exists:assets,id',
             'schedule_type' => 'required|string|max:50',
-            'pic_name' => 'nullable|string',
         ]);
 
         // Cek double schedule
@@ -66,7 +62,6 @@ class PmScheduleController extends Controller
         PmSchedule::create([
             'asset_id' => $request->asset_id,
             'schedule_type' => $request->schedule_type,
-            'pic_name' => $request->pic_name,
             'name' => "{$typeName} - {$asset->name}",
             'description' => "Preventive Maintenance untuk {$asset->name}",
             'is_active' => $request->has('is_active'),
@@ -82,37 +77,32 @@ class PmScheduleController extends Controller
     }
 
     public function edit(PmSchedule $pmSchedule)
-{
-    $machines = Asset::orderBy('fa_code')->get();
-    
-    // Ambil daftar teknisi untuk pilihan kawan
-    $technicians = User::whereIn('role', ['mtc', 'MTC'])->orderBy('name')->get();
-    $scheduleTypes = $this->scheduleTypes();
-    
-    return view('pm-schedules.edit', compact('pmSchedule', 'machines', 'scheduleTypes', 'technicians'));
-}
+    {
+        $machines = Asset::orderBy('fa_code')->get();
+        $scheduleTypes = $this->scheduleTypes();
 
-public function update(Request $request, PmSchedule $pmSchedule)
-{
-    $request->validate([
-        'asset_id' => 'required|exists:assets,id',
-        'schedule_type' => 'required|string|max:50',
-        'pic_name' => 'nullable|string', // Pastikan divalidasi kawan
-    ]);
+        return view('pm-schedules.edit', compact('pmSchedule', 'machines', 'scheduleTypes'));
+    }
 
-    $asset = Asset::findOrFail($request->asset_id);
-    $typeName = $this->scheduleTypeName($request->schedule_type);
+    public function update(Request $request, PmSchedule $pmSchedule)
+    {
+        $request->validate([
+            'asset_id' => 'required|exists:assets,id',
+            'schedule_type' => 'required|string|max:50',
+        ]);
 
-    $pmSchedule->update([
-        'asset_id' => $request->asset_id,
-        'schedule_type' => $request->schedule_type,
-        'pic_name' => $request->pic_name, // Simpan PIC baru kawan
-        'name' => "{$typeName} - {$asset->name}",
-        'is_active' => $request->has('is_active'),
-    ]);
+        $asset = Asset::findOrFail($request->asset_id);
+        $typeName = $this->scheduleTypeName($request->schedule_type);
 
-    return redirect()->route('pm.schedule.index')->with('success', 'Jadwal PM diperbarui kawan.');
-}
+        $pmSchedule->update([
+            'asset_id' => $request->asset_id,
+            'schedule_type' => $request->schedule_type,
+            'name' => "{$typeName} - {$asset->name}",
+            'is_active' => $request->has('is_active'),
+        ]);
+
+        return redirect()->route('pm.schedule.index')->with('success', 'Jadwal PM diperbarui kawan.');
+    }
 
     public function destroy(PmSchedule $pmSchedule)
     {
