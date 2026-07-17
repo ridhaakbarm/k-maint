@@ -7,7 +7,8 @@ use App\Models\PmSchedule;
 use App\Models\Asset;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use App\Imports\ChecklistImport; // Pastikan file ini ada di folder app/Imports
+use App\Imports\ChecklistImport;
+use App\Exports\ChecklistTemplateExport;
 use Maatwebsite\Excel\Facades\Excel;
 
 class ChecklistTemplateController extends Controller
@@ -15,17 +16,25 @@ class ChecklistTemplateController extends Controller
     public function __construct()
     {
         $this->middleware(function ($request, $next) {
-            // Gunakan pengecekan role sesuai sistem K-Maint
-            if (!Auth::user()->isAdmin() && !Auth::user()->isMTC()) {
+            $user = Auth::user();
+            
+            if (!$user->isAdmin() && !$user->isMTC()) {
                 abort(403, 'Akses ditolak. Hanya Admin atau MTC yang diperbolehkan.');
             }
+
+            $restrictedMethods = ['create', 'store', 'edit', 'update', 'destroy', 'import', 'toggleStatus'];
+            if (in_array($request->route()->getActionMethod(), $restrictedMethods)) {
+                if ($user->username !== 'andre') {
+                    abort(403, 'Akses ditolak. Hanya akun andre yang dapat mengedit template.');
+                }
+            }
+
             return $next($request);
         });
     }
 
     public function index()
     {
-        // Eager load asset melalui pmSchedule
         $checklistTemplates = ChecklistTemplate::with('pmSchedule.asset')
             ->orderBy('pm_schedule_id')
             ->orderBy('order')
@@ -149,6 +158,10 @@ class ChecklistTemplateController extends Controller
         }
 
         return back()->with('success', $message);
+    }
+    public function export()
+    {
+        return Excel::download(new ChecklistTemplateExport, 'checklist_templates.xlsx');
     }
 
     // METHOD IMPORT YANG MENYEBABKAN ERROR TADI

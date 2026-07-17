@@ -162,6 +162,7 @@ Route::middleware(['auth', 'admin'])->group(function () {
     Route::resource('checklist-templates', ChecklistTemplateController::class)->names('pm.templates');
     Route::post('checklist-templates/import', [ChecklistTemplateController::class, 'import'])->name('pm.templates.import');
     Route::get('checklist-templates/by-schedule/{scheduleId}', [ChecklistTemplateController::class, 'getBySchedule'])->name('pm.templates.by-schedule');
+    Route::get('checklist-templates-export', [ChecklistTemplateController::class, 'export'])->name('pm.templates.export');
 
     // Fitur Penjadwalan (Assignment Teknisi)
     Route::get('/scheduling', [SchedulingController::class, 'index'])->name('scheduling.index');

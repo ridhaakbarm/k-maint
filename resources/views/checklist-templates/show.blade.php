@@ -39,9 +39,11 @@
                 </table>
             </div>
             <div class="card-footer bg-white">
+                @if(auth()->user()->username === 'andre')
                 <a href="{{ route('pm.templates.edit', $checklistTemplate->id) }}" class="btn btn-warning px-4">
                     <i class="fas fa-edit me-1"></i> Edit Template
                 </a>
+                @endif
                 <a href="{{ route('pm.templates.index') }}" class="btn btn-secondary px-4">
                     <i class="fas fa-arrow-left me-1"></i> Kembali
                 </a>
