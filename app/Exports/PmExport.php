@@ -139,7 +139,7 @@ class PmActualItemsSheet implements FromCollection, WithHeadings, WithMapping, W
         return [
             $pmCheck->id ?? '-',
             $pmCheck->week_number ?? '-',
-            PmExportData::scheduleTypeLabel($schedule->schedule_type ?? null),
+            PmExportData::scheduleTypeLabel($template->frequency_label ?? $schedule->schedule_type ?? null),
             $schedule->asset->name ?? '-',
             $schedule->name ?? '-',
             $pmCheck->technician->name ?? $pmCheck->technician_name ?? '-',
@@ -462,7 +462,7 @@ class PmExportData
                 'target_date_sort' => $targetDate->toDateString(),
                 'target_date' => $targetDate->format('d/m/Y'),
                 'week_number' => $weekNumber,
-                'schedule_type_label' => self::scheduleTypeLabel($schedule->schedule_type ?? null),
+                'schedule_type_label' => self::scheduleTypeLabel($template->frequency_label ?? $schedule->schedule_type ?? null),
                 'asset_name' => $schedule->asset->name ?? '-',
                 'schedule_name' => $schedule->name ?? '-',
                 'schedule_id' => $schedule->id,
@@ -540,6 +540,7 @@ class PmExportData
         return [
             'daily' => 'Daily',
             'weekly' => 'Weekly',
+            'bi-weekly' => 'Bi-Weekly',
             'monthly' => 'Monthly',
             'quarterly' => 'Quarterly',
             'yearly' => 'Yearly',

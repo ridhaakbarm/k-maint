@@ -547,6 +547,15 @@
                                         <td>
                                             <div class="custom-item-name">
                                                 {{ $item->checklistTemplate->item_name }}
+                                                @if($item->checklistTemplate->frequency_label === 'bi-weekly')
+                                                    <span class="badge bg-secondary ms-1" style="font-size:0.7rem;"><i class="fas fa-calendar-week me-1"></i>Bi-Weekly</span>
+                                                @elseif($item->checklistTemplate->frequency_label === 'monthly')
+                                                    <span class="badge bg-info text-dark ms-1" style="font-size:0.7rem;"><i class="fas fa-calendar-alt me-1"></i>Monthly</span>
+                                                @elseif($item->checklistTemplate->frequency_label === 'quarterly')
+                                                    <span class="badge bg-danger ms-1" style="font-size:0.7rem;"><i class="fas fa-calendar me-1"></i>Quarterly</span>
+                                                @elseif($item->checklistTemplate->frequency_label === 'yearly')
+                                                    <span class="badge bg-warning text-dark ms-1" style="font-size:0.7rem;"><i class="fas fa-calendar-check me-1"></i>Yearly</span>
+                                                @endif
                                             </div>
                                             <div class="custom-part-detail">
                                                 <i class="fas fa-puzzle-piece me-1"></i>

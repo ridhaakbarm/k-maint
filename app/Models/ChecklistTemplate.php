@@ -29,4 +29,19 @@ public function checkItems()
 {
     return $this->hasMany(PmCheckItem::class, 'checklist_template_id');
 }
+
+public function getFrequencyLabelAttribute()
+{
+    $activeWeeks = is_array($this->active_weeks) ? $this->active_weeks : json_decode($this->active_weeks, true);
+    if (!is_array($activeWeeks)) return 'weekly';
+
+    $count = count($activeWeeks);
+
+    if ($count >= 24 && $count <= 28) return 'bi-weekly';
+    if ($count >= 11 && $count <= 14) return 'monthly';
+    if ($count >= 3 && $count <= 5) return 'quarterly';
+    if ($count >= 1 && $count <= 2) return 'yearly';
+
+    return 'weekly';
+}
 }
