@@ -444,6 +444,11 @@ public function batchUpdateItems(Request $request, $checkId)
                   ->orWhere(fn($q) => Auth::user()->isAdmin());
         })
         ->where('status', 'in_progress')
+        ->where(function($query) {
+            $query->where('technician_id', Auth::id())
+                  ->orWhere(fn($q) => Auth::user()->isAdmin());
+        })
+        ->where('status', 'in_progress')
         ->firstOrFail();
 
     // REVISI: Status menjadi waiting_verification (Menunggu Verifikasi)
@@ -452,7 +457,8 @@ public function batchUpdateItems(Request $request, $checkId)
     // Tutup aktivitas di Monitoring Board
     TechnicianActivity::where('user_id', Auth::id())
         ->where('status', 'running')
-        ->update(['status' => 'completed', 'end_time' => now()]);
+        ->get()
+        ->each(fn($activity) => $activity->complete(now()));
 
     // Redirect ke index karena tugas sudah selesai dari sisi teknisi
     return redirect()->route('pm.execution.index', [
@@ -471,10 +477,8 @@ public function batchUpdateItems(Request $request, $checkId)
         // 1. Berhentikan tugas lama teknisi ini yang masih 'running'
         TechnicianActivity::where('user_id', Auth::id())
             ->where('status', 'running')
-            ->update([
-                'status' => 'completed', 
-                'end_time' => now()
-            ]);
+            ->get()
+            ->each(fn($activity) => $activity->complete(now()));
 
         // 2. Buat log aktivitas baru
         TechnicianActivity::create([

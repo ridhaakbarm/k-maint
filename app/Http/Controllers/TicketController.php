@@ -400,6 +400,12 @@ public function startWork(Request $request, Ticket $ticket)
 
     $ticket->update($updateData);
 
+    // Tutup aktivitas lama teknisi yang sedang jalan (jika ada)
+    TechnicianActivity::where('user_id', Auth::id())
+        ->where('status', 'running')
+        ->get()
+        ->each(fn($activity) => $activity->complete(now()));
+
     // Integrasi Monitoring Board tetap jalan kawan
     TechnicianActivity::create([
         'user_id' => Auth::id(),
