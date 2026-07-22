@@ -24,7 +24,6 @@ RUN apt-get update \
     && docker-php-ext-install -j"$(nproc)" \
         bcmath \
         curl \
-        dom \
         exif \
         gd \
         intl \
@@ -32,11 +31,7 @@ RUN apt-get update \
         opcache \
         pcntl \
         pdo_mysql \
-        simplexml \
         soap \
-        xml \
-        xmlreader \
-        xmlwriter \
         zip \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
