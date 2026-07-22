@@ -1,4 +1,4 @@
-FROM mirror.gcr.io/library/php:8.2-fpm-bookworm AS php-base
+FROM public.ecr.aws/docker/library/php:8.2-fpm-bookworm AS php-base
 
 WORKDIR /var/www/html
 
@@ -36,7 +36,7 @@ RUN apt-get update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-FROM mirror.gcr.io/library/composer:2 AS composer-bin
+FROM public.ecr.aws/docker/library/composer:2 AS composer-bin
 
 FROM php-base AS vendor
 
