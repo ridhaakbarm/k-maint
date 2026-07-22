@@ -1,4 +1,4 @@
-FROM php:8.2-fpm-bookworm AS php-base
+FROM mirror.gcr.io/library/php:8.2-fpm-bookworm AS php-base
 
 WORKDIR /var/www/html
 
@@ -36,9 +36,11 @@ RUN apt-get update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+FROM mirror.gcr.io/library/composer:2 AS composer-bin
+
 FROM php-base AS vendor
 
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+COPY --from=composer-bin /usr/bin/composer /usr/bin/composer
 
 COPY composer.json composer.lock ./
 RUN composer install \
