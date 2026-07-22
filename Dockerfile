@@ -1,4 +1,4 @@
-FROM public.ecr.aws/docker/library/php:8.2-fpm-bookworm AS php-base
+FROM public.ecr.aws/docker/library/php:8.3-fpm-bookworm AS php-base
 
 WORKDIR /var/www/html
 
