@@ -607,7 +607,7 @@
                                             <option value="all">Semua Status</option>
                                             <option value="open">Open</option>
                                             <option value="onprogress">On Progress</option>
-                                            <option value="schedule">Schedule</option>
+                                            <option value="pending">Pending</option>
                                             <option value="request_to_close">Request to Close</option>
                                             <option value="closed">Closed</option>
                                             <option value="rejected">Rejected</option>

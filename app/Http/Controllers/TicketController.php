@@ -48,7 +48,7 @@ class TicketController extends Controller
             'onprogress' => $query->clone()->where('status', 'onprogress')->count(),
             'request_to_close' => $query->clone()->where('status', 'request_to_close')->count(),
             'closed' => $query->clone()->where('status', 'closed')->count(),
-            'schedule' => $query->clone()->where('status', 'schedule')->count(),
+            'pending' => $query->clone()->where('status', 'pending')->count(),
             'rejected' => $query->clone()->where('status', 'rejected')->count(),
         ];
 

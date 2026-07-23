@@ -9,8 +9,8 @@ use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\FromCollection;
-use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithHeadings;
+use Maatwebsite\Excel\Concerns\WithColumnWidths;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 use Maatwebsite\Excel\Concerns\WithStyles;
@@ -42,7 +42,7 @@ class PmExport implements WithMultipleSheets
     }
 }
 
-class PmActualItemsSheet implements FromCollection, WithHeadings, WithMapping, WithStyles, ShouldAutoSize, WithTitle
+class PmActualItemsSheet implements FromCollection, WithHeadings, WithMapping, WithStyles, WithColumnWidths, WithTitle
 {
     protected Carbon $startDate;
     protected Carbon $endDate;
@@ -65,7 +65,14 @@ class PmActualItemsSheet implements FromCollection, WithHeadings, WithMapping, W
             'checklistTemplate',
             'checkedBy',
             'verifiedBy',
-            'pmCheck.checkItems',
+            'pmCheck' => function ($query) {
+                $query->withCount([
+                    'checkItems as export_total_items_count',
+                    'checkItems as export_completed_items_count' => fn($items) => $items
+                        ->whereNotNull('condition')
+                        ->where('condition', '!=', ''),
+                ]);
+            },
             'pmCheck.pmSchedule.asset',
             'pmCheck.technician',
             'pmCheck.admin',
@@ -132,8 +139,8 @@ class PmActualItemsSheet implements FromCollection, WithHeadings, WithMapping, W
         $schedule = $pmCheck?->pmSchedule;
         $template = $item->checklistTemplate;
 
-        $totalItems = $pmCheck?->checkItems?->count() ?? 0;
-        $completedItems = $pmCheck?->checkItems?->whereNotNull('condition')->where('condition', '!=', '')->count() ?? 0;
+        $totalItems = $pmCheck->export_total_items_count ?? 0;
+        $completedItems = $pmCheck->export_completed_items_count ?? 0;
         $progress = $totalItems > 0 ? round(($completedItems / $totalItems) * 100, 1) : 0;
 
         return [
@@ -182,9 +189,22 @@ class PmActualItemsSheet implements FromCollection, WithHeadings, WithMapping, W
 
         return [];
     }
+
+    public function columnWidths(): array
+    {
+        return [
+            'A' => 10, 'B' => 8, 'C' => 14, 'D' => 24, 'E' => 26,
+            'F' => 20, 'G' => 14, 'H' => 14, 'I' => 10, 'J' => 16,
+            'K' => 10, 'L' => 12, 'M' => 12, 'N' => 10, 'O' => 28,
+            'P' => 22, 'Q' => 35, 'R' => 28, 'S' => 22, 'T' => 18,
+            'U' => 20, 'V' => 28, 'W' => 28, 'X' => 18, 'Y' => 28,
+            'Z' => 16, 'AA' => 18, 'AB' => 18, 'AC' => 18, 'AD' => 28,
+            'AE' => 20,
+        ];
+    }
 }
 
-class PmPlannedItemsSheet implements FromArray, WithHeadings, WithStyles, ShouldAutoSize, WithTitle
+class PmPlannedItemsSheet implements FromArray, WithHeadings, WithStyles, WithColumnWidths, WithTitle
 {
     protected Collection $rows;
 
@@ -271,9 +291,20 @@ class PmPlannedItemsSheet implements FromArray, WithHeadings, WithStyles, Should
 
         return [];
     }
+
+    public function columnWidths(): array
+    {
+        return [
+            'A' => 22, 'B' => 14, 'C' => 8, 'D' => 14, 'E' => 24,
+            'F' => 26, 'G' => 12, 'H' => 12, 'I' => 10, 'J' => 28,
+            'K' => 22, 'L' => 35, 'M' => 28, 'N' => 12, 'O' => 18,
+            'P' => 20, 'Q' => 16, 'R' => 10, 'S' => 22, 'T' => 18,
+            'U' => 20, 'V' => 28, 'W' => 28, 'X' => 18,
+        ];
+    }
 }
 
-class PmSummarySheet implements FromArray, WithStyles, ShouldAutoSize, WithTitle
+class PmSummarySheet implements FromArray, WithStyles, WithColumnWidths, WithTitle
 {
     protected Collection $plannedRows;
     protected Carbon $startDate;
@@ -374,6 +405,18 @@ class PmSummarySheet implements FromArray, WithStyles, ShouldAutoSize, WithTitle
         ]);
 
         return [];
+    }
+
+    public function columnWidths(): array
+    {
+        return [
+            'A' => 28,
+            'B' => 18,
+            'C' => 18,
+            'D' => 18,
+            'E' => 18,
+            'F' => 18,
+        ];
     }
 }
 
@@ -504,15 +547,6 @@ class PmExportData
         $dataRange = 'A1:' . $lastColumn . $rowCount;
         $headerRange = 'A1:' . $lastColumn . '1';
 
-        $sheet->getStyle($dataRange)->applyFromArray([
-            'borders' => [
-                'allBorders' => [
-                    'borderStyle' => Border::BORDER_THIN,
-                    'color' => ['argb' => '000000'],
-                ],
-            ],
-        ]);
-
         $sheet->getStyle($headerRange)->getFont()->setBold(true);
         $sheet->getStyle($headerRange)->getAlignment()->setHorizontal('center');
         $sheet->getStyle($headerRange)->getFill()->applyFromArray([
@@ -521,6 +555,7 @@ class PmExportData
         ]);
 
         $sheet->getRowDimension(1)->setRowHeight(25);
+        $sheet->getStyle($headerRange)->getBorders()->getBottom()->setBorderStyle(Border::BORDER_THIN);
         $sheet->getStyle('A1:' . $lastColumn . $rowCount)->getAlignment()->setVertical('top');
     }
 
