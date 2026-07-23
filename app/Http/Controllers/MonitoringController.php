@@ -212,7 +212,7 @@ class MonitoringController extends Controller
         return view('teknisi.dashboard', compact('currentActivity'));
     }
 
-    public function pmMonitoring(Request $request)
+        public function pmMonitoring(Request $request)
     {
         $user = Auth::user();
         if (!($user->isAdmin() || $user->isManager() || $user->isSPV() || $user->isMTC())) {
@@ -220,73 +220,157 @@ class MonitoringController extends Controller
         }
 
         $period = $request->get('period', 'monthly');
-        $dateFrom = $request->get('date_from', now()->startOfMonth()->toDateString());
-        $dateTo = $request->get('date_to', now()->endOfMonth()->toDateString());
-
-        if ($period === 'daily') {
-            $dateFrom = $request->get('date_from', now()->toDateString());
-            $dateTo = $dateFrom;
-        } elseif ($period === 'weekly') {
-            $dateFrom = now()->startOfWeek()->toDateString();
-            $dateTo = now()->endOfWeek()->toDateString();
-        } elseif ($period === 'monthly') {
-            $dateFrom = now()->startOfMonth()->toDateString();
-            $dateTo = now()->endOfMonth()->toDateString();
+        
+        if ($period === 'custom') {
+            $dateFrom = $request->get('date_from', now()->startOfMonth()->toDateString());
+            $dateTo = $request->get('date_to', now()->endOfMonth()->toDateString());
+            $filterMonth = now()->format('Y-m');
+        } else {
+            // Default to monthly
+            $period = 'monthly';
+            $filterMonth = $request->get('filter_month', now()->format('Y-m'));
+            $parsedMonth = \Carbon\Carbon::createFromFormat('Y-m', $filterMonth);
+            $dateFrom = $parsedMonth->startOfMonth()->toDateString();
+            $dateTo = $parsedMonth->endOfMonth()->toDateString();
         }
 
-        $scheduleType = $request->get('schedule_type', 'all');
-        $technicianId = $request->get('technician_id', 'all');
-        $technicians = User::where('role', 'mtc')->orderBy('name')->get();
+        // 1. Data Source for Items
+        // Use logic from pmItemProgressSummary to calculate totals
+        $start = \Carbon\Carbon::parse($dateFrom)->startOfDay();
+        $end = \Carbon\Carbon::parse($dateTo)->endOfDay();
+        $daysInPeriod = $start->diffInDays($end) + 1;
+        $weeksInPeriod = collect(range(0, $daysInPeriod - 1))
+            ->map(fn($offset) => (int) $start->copy()->addDays($offset)->weekOfYear)
+            ->unique()
+            ->values();
 
-        $baseQuery = PmCheck::with(['pmSchedule.asset', 'technician', 'checkItems'])
+        // Ambil semua jadwal PM yang aktif
+        $schedules = \App\Models\PmSchedule::with(['asset', 'checklistTemplates' => fn($q) => $q->where('is_active', true)])
+            ->where('is_active', true)
+            ->get();
+
+        $totalTargetItems = 0;
+        $assetProgressData = [];
+
+        foreach ($schedules as $schedule) {
+            $assetId = $schedule->asset_id;
+            $assetName = $schedule->asset ? $schedule->asset->name : 'Unknown';
+
+            if (!isset($assetProgressData[$assetId])) {
+                $assetProgressData[$assetId] = [
+                    'asset_name' => $assetName,
+                    'target' => 0,
+                    'done' => 0,
+                    'not_done' => 0,
+                ];
+            }
+
+            // Hitung target untuk jadwal ini
+            $target = 0;
+            if ($schedule->schedule_type === 'daily') {
+                $target = $schedule->checklistTemplates->count() * $daysInPeriod;
+            } else {
+                $target = $weeksInPeriod->sum(function ($weekNumber) use ($schedule) {
+                    return $schedule->checklistTemplates
+                        ->filter(fn($template) => $this->templateActiveInWeek($template, $weekNumber))
+                        ->count();
+                });
+            }
+
+            $assetProgressData[$assetId]['target'] += $target;
+            $totalTargetItems += $target;
+        }
+
+        // Ambil semua Check Items dalam periode
+        $pmChecks = \App\Models\PmCheck::with('checkItems')
             ->where(function ($query) use ($dateFrom, $dateTo) {
                 $query->whereBetween('check_date', [$dateFrom, $dateTo])
                     ->orWhere(function ($fallback) use ($dateFrom, $dateTo) {
                         $fallback->whereNull('check_date')
                             ->whereBetween('due_date', [$dateFrom, $dateTo]);
                     });
-            });
+            })
+            ->get();
 
-        if ($scheduleType !== 'all') {
-            $baseQuery->whereHas('pmSchedule', fn($q) => $q->where('schedule_type', $scheduleType));
+        $totalDoneItems = 0;
+        $totalNotOkItems = 0;
+
+        foreach ($pmChecks as $check) {
+            $assetId = $check->pmSchedule->asset_id ?? null;
+            if (!$assetId) continue;
+
+            $doneInCheck = 0;
+            foreach ($check->checkItems as $item) {
+                if (!empty($item->condition)) {
+                    $doneInCheck++;
+                    if (!in_array(strtolower($item->condition), ['ok', 'baik', 'normal'])) {
+                        $totalNotOkItems++;
+                    }
+                }
+            }
+
+            if (isset($assetProgressData[$assetId])) {
+                $assetProgressData[$assetId]['done'] += $doneInCheck;
+            }
+            $totalDoneItems += $doneInCheck;
         }
 
-        if ($technicianId !== 'all') {
-            $baseQuery->where('technician_id', $technicianId);
-        }
-
-        $pmChecks = $baseQuery->get();
-        $closedStatuses = ['approved', 'closed'];
-        $completedStatuses = ['completed', 'verified'];
-        $notFinishedStatuses = ['pending', 'in_progress', 'waiting_verification'];
-
-        $totalItems = $pmChecks->sum(fn($check) => $check->checkItems->count());
-        $doneItems = $pmChecks->sum(fn($check) => $check->checkItems->whereNotNull('condition')->where('condition', '!=', '')->count());
-        $notOkItems = $pmChecks->sum(function ($check) {
-            return $check->checkItems->filter(function ($item) {
-                return $item->condition && !in_array(strtolower($item->condition), ['ok', 'baik', 'normal']);
-            })->count();
-        });
+        // Calculate progress for each asset
+        $assetProgress = collect($assetProgressData)->map(function($data) {
+            $data['not_done'] = max(0, $data['target'] - $data['done']);
+            $data['progress'] = $data['target'] > 0 ? round(($data['done'] / $data['target']) * 100, 1) : 0;
+            return $data;
+        })->filter(fn($data) => $data['target'] > 0)->sortByDesc('progress')->values();
 
         $statusSummary = [
-            'total' => $pmChecks->count(),
-            'belum_usai' => $pmChecks->whereIn('status', $notFinishedStatuses)->count(),
-            'selesai' => $pmChecks->whereIn('status', $completedStatuses)->count(),
-            'closed' => $pmChecks->whereIn('status', $closedStatuses)->count(),
-            'pending' => $pmChecks->where('status', 'pending')->count(),
-            'in_progress' => $pmChecks->where('status', 'in_progress')->count(),
-            'waiting_verification' => $pmChecks->where('status', 'waiting_verification')->count(),
-            'overdue' => $pmChecks->filter(fn($check) => $check->due_date && Carbon::parse($check->due_date)->lt(today()) && !in_array($check->status, array_merge($completedStatuses, $closedStatuses)))->count(),
-            'total_items' => $totalItems,
-            'done_items' => $doneItems,
-            'not_ok_items' => $notOkItems,
-            'progress' => $totalItems > 0 ? round(($doneItems / $totalItems) * 100, 1) : 0,
+            'total_target' => $totalTargetItems,
+            'done' => $totalDoneItems,
+            'not_done' => max(0, $totalTargetItems - $totalDoneItems),
+            'not_ok' => $totalNotOkItems,
+            'total_machines' => collect($assetProgressData)->filter(fn($d) => $d['target'] > 0)->count(),
+            'progress' => $totalTargetItems > 0 ? round(($totalDoneItems / $totalTargetItems) * 100, 1) : 0,
         ];
 
+        // Technician Performance
+        $technicians = \App\Models\User::where('role', 'mtc')->orderBy('name')->get();
+        $pmActivities = \App\Models\TechnicianActivity::where('category', 'PM')
+            ->whereDate('start_time', '>=', $dateFrom)
+            ->whereDate('start_time', '<=', $dateTo)
+            ->get()
+            ->groupBy('user_id');
+
+        $technicianPerformance = $technicians->map(function ($tech) use ($dateFrom, $dateTo, $pmActivities) {
+            // Count items verified by this technician
+            $doneItemCount = \App\Models\PmCheckItem::where('checked_by_user_id', $tech->id)
+                ->whereHas('pmCheck', function ($query) use ($dateFrom, $dateTo) {
+                    $query->whereBetween('check_date', [$dateFrom, $dateTo])
+                        ->orWhere(function ($fallback) use ($dateFrom, $dateTo) {
+                            $fallback->whereNull('check_date')
+                                ->whereBetween('due_date', [$dateFrom, $dateTo]);
+                        });
+                })
+                ->count();
+
+            $activityMinutes = ($pmActivities->get($tech->id) ?? collect())->sum(function ($activity) {
+                return $activity->status === 'running'
+                    ? $activity->start_time->diffInMinutes(now())
+                    : ($activity->duration ?? 0);
+            });
+
+            return [
+                'technician' => $tech,
+                'done_items' => $doneItemCount,
+                'pm_hours' => round($activityMinutes / 60, 2),
+            ];
+        })->filter(fn($row) => $row['done_items'] > 0 || $row['pm_hours'] > 0)
+          ->sortByDesc('done_items')
+          ->values();
+
+        // Retain the period summary for "Rincian Item PM" exactly as it was
         $pmItemPeriodSummary = [
             'monthly' => $this->pmItemProgressSummary(
-                Carbon::parse($dateFrom)->copy()->startOfMonth(),
-                Carbon::parse($dateFrom)->copy()->endOfMonth(),
+                \Carbon\Carbon::parse($dateFrom)->copy()->startOfMonth(),
+                \Carbon\Carbon::parse($dateFrom)->copy()->endOfMonth(),
                 ['daily', 'weekly', 'yearly']
             ),
             'weekly' => $this->pmItemProgressSummary(
@@ -301,120 +385,11 @@ class MonitoringController extends Controller
             ),
         ];
 
-        $monthReference = Carbon::parse($dateFrom);
-        $monthWeeks = collect(range(0, $monthReference->daysInMonth - 1))
-            ->map(fn($offset) => $monthReference->copy()->startOfMonth()->addDays($offset)->weekOfYear)
-            ->unique()
-            ->values();
-
-        $activeMonthSchedules = PmSchedule::with(['asset', 'checklistTemplates' => fn($q) => $q->where('is_active', true)])
-            ->where('is_active', true)
-            ->whereHas('checklistTemplates', function ($q) use ($monthWeeks) {
-                $q->where('is_active', true)
-                    ->where(function ($query) use ($monthWeeks) {
-                        $query->whereHas('pmSchedule', fn($scheduleQuery) => $scheduleQuery->where('schedule_type', 'daily'));
-
-                        foreach ($monthWeeks as $week) {
-                            $query->orWhereJsonContains('active_weeks', $week)
-                                ->orWhereJsonContains('active_weeks', (string) $week);
-                        }
-                    });
-            })
-            ->get();
-
-        $today = now();
-        $todayWeek = (int) $today->weekOfYear;
-        $todaySchedules = $this->activePmSchedulesForWeek($todayWeek);
-        $todayChecks = PmCheck::whereIn('pm_schedule_id', $todaySchedules->pluck('id'))
-            ->where(function ($query) use ($today, $todayWeek) {
-                $query->whereDate('check_date', $today->toDateString())
-                    ->orWhere('week_number', $todayWeek);
-            })
-            ->get()
-            ->keyBy('pm_schedule_id');
-
-        $todayDoneStatuses = array_merge($completedStatuses, $closedStatuses);
-        $todaySummary = [
-            'scheduled' => $todaySchedules->count(),
-            'not_started' => $todaySchedules->filter(fn($schedule) => !$todayChecks->has($schedule->id))->count(),
-            'in_progress' => $todayChecks->whereIn('status', ['pending', 'in_progress', 'waiting_verification'])->count(),
-            'done' => $todayChecks->whereIn('status', $todayDoneStatuses)->count(),
-        ];
-
-        $currentMonthStart = now()->startOfMonth()->toDateString();
-        $currentMonthEnd = now()->endOfMonth()->toDateString();
-        $followUpItemsCurrentMonth = PmCheckItem::whereNotNull('next_action')
-            ->where('next_action', '!=', '')
-            ->whereHas('pmCheck', function ($query) use ($currentMonthStart, $currentMonthEnd) {
-                $query->where(function ($dateQuery) use ($currentMonthStart, $currentMonthEnd) {
-                    $dateQuery->whereBetween('check_date', [$currentMonthStart, $currentMonthEnd])
-                        ->orWhere(function ($fallback) use ($currentMonthStart, $currentMonthEnd) {
-                            $fallback->whereNull('check_date')
-                                ->whereBetween('due_date', [$currentMonthStart, $currentMonthEnd]);
-                        });
-                });
-            })
-            ->get();
-
-        $followUpSummary = [
-            'total' => $followUpItemsCurrentMonth->count(),
-            'open' => $followUpItemsCurrentMonth->where('follow_up_status', '!=', 'OK')->count(),
-            'ok' => $followUpItemsCurrentMonth->where('follow_up_status', 'OK')->count(),
-        ];
-
-        $scheduleTypeSummary = $pmChecks
-            ->groupBy(fn($check) => $check->pmSchedule->schedule_type ?? 'unknown')
-            ->map(function ($items, $type) use ($completedStatuses, $closedStatuses) {
-                $closed = $items->whereIn('status', $closedStatuses)->count();
-                $completed = $items->whereIn('status', $completedStatuses)->count();
-                return [
-                    'type' => $type,
-                    'total' => $items->count(),
-                    'done' => $completed + $closed,
-                    'open' => $items->count() - $completed - $closed,
-                    'rate' => $items->count() > 0 ? round((($completed + $closed) / $items->count()) * 100, 1) : 0,
-                ];
-            })->values();
-
-        $pmActivities = TechnicianActivity::where('category', 'PM')
-            ->whereDate('start_time', '>=', $dateFrom)
-            ->whereDate('start_time', '<=', $dateTo)
-            ->get()
-            ->groupBy('user_id');
-
-        $technicianPerformance = $technicians->map(function ($tech) use ($pmChecks, $pmActivities, $completedStatuses, $closedStatuses) {
-            $checks = $pmChecks->where('technician_id', $tech->id);
-            $items = $checks->flatMap->checkItems;
-            $doneItemCount = $items->whereNotNull('condition')->where('condition', '!=', '')->count();
-            $totalItemCount = $items->count();
-            $closedCount = $checks->whereIn('status', $closedStatuses)->count();
-            $completedCount = $checks->whereIn('status', $completedStatuses)->count();
-            $activityMinutes = ($pmActivities->get($tech->id) ?? collect())->sum(function ($activity) {
-                return $activity->status === 'running'
-                    ? $activity->start_time->diffInMinutes(now())
-                    : ($activity->duration ?? 0);
-            });
-
-            return [
-                'technician' => $tech,
-                'assigned' => $checks->count(),
-                'completed' => $completedCount,
-                'closed' => $closedCount,
-                'not_finished' => $checks->whereIn('status', ['pending', 'in_progress', 'waiting_verification'])->count(),
-                'waiting_verification' => $checks->where('status', 'waiting_verification')->count(),
-                'total_items' => $totalItemCount,
-                'done_items' => $doneItemCount,
-                'not_ok_items' => $items->filter(fn($item) => $item->condition && !in_array(strtolower($item->condition), ['ok', 'baik', 'normal']))->count(),
-                'completion_rate' => $checks->count() > 0 ? round((($completedCount + $closedCount) / $checks->count()) * 100, 1) : 0,
-                'item_rate' => $totalItemCount > 0 ? round(($doneItemCount / $totalItemCount) * 100, 1) : 0,
-                'pm_hours' => round($activityMinutes / 60, 2),
-            ];
-        })->filter(fn($row) => $row['assigned'] > 0 || $row['total_items'] > 0)
-            ->sortByDesc('item_rate')
-            ->values();
+        $completedStatuses = ['completed', 'verified'];
+        $closedStatuses = ['approved', 'closed'];
 
         $overdueChecks = $pmChecks
-            ->filter(fn($check) => $check->due_date && Carbon::parse($check->due_date)->lt(today()) && !in_array($check->status, array_merge($completedStatuses, $closedStatuses)))
+            ->filter(fn($check) => $check->due_date && \Carbon\Carbon::parse($check->due_date)->lt(today()) && !in_array($check->status, array_merge($completedStatuses, $closedStatuses)))
             ->sortBy('due_date')
             ->take(10)
             ->values();
@@ -425,29 +400,17 @@ class MonitoringController extends Controller
             ->take(10)
             ->values();
 
-        $recentFinishedChecks = $pmChecks
-            ->whereIn('status', array_merge($completedStatuses, $closedStatuses))
-            ->sortByDesc('updated_at')
-            ->take(10)
-            ->values();
-
         return view('monitoring.pm', compact(
             'period',
             'dateFrom',
             'dateTo',
-            'scheduleType',
-            'technicianId',
-            'technicians',
+            'filterMonth',
             'statusSummary',
-            'activeMonthSchedules',
             'pmItemPeriodSummary',
-            'todaySummary',
-            'followUpSummary',
-            'scheduleTypeSummary',
+            'assetProgress',
             'technicianPerformance',
             'overdueChecks',
-            'needVerificationChecks',
-            'recentFinishedChecks'
+            'needVerificationChecks'
         ));
     }
 

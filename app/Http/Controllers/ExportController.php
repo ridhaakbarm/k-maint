@@ -52,6 +52,20 @@ class ExportController extends Controller
     }
 
     // Export PM ke Excel
+        public function exportTechnicianPmItems(Request $request)
+    {
+        $validated = $request->validate([
+            'start_date' => 'required|date',
+            'end_date' => 'required|date',
+            'technician_id' => 'required|exists:users,id',
+        ]);
+
+        $tech = \App\Models\User::find($validated['technician_id']);
+        $filename = 'Item_PM_' . str_replace(' ', '_', $tech->name) . '_' . $validated['start_date'] . '_sd_' . $validated['end_date'] . '.xlsx';
+
+        return Excel::download(new \App\Exports\TechnicianPmItemsExport($validated['start_date'], $validated['end_date'], $validated['technician_id']), $filename);
+    }
+
     public function exportPm(Request $request)
     {
         $validated = $request->validate([

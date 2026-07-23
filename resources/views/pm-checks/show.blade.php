@@ -91,6 +91,45 @@
     .select2-results__option {
         padding: 10px 12px !important;
     }
+
+    .pm-result-cell .select2-container--bootstrap-5 .select2-selection--single {
+        height: 42px !important;
+        min-height: 42px !important;
+        display: block !important;
+        padding: 6px 34px 6px 10px !important;
+        overflow: hidden !important;
+    }
+
+    .pm-result-cell .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+        display: block !important;
+        width: 100% !important;
+        line-height: 28px !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        padding-right: 0 !important;
+    }
+
+    .pm-result-cell .select2-container--bootstrap-5 .select2-selection--single .select2-selection__arrow {
+        top: 50% !important;
+        transform: translateY(-50%);
+        right: 8px !important;
+    }
+
+    .pm-result-cell .select2-container--bootstrap-5 .select2-selection__clear {
+        margin-right: 18px !important;
+    }
+
+    .column-note {
+        display: block;
+        margin-top: 3px;
+        color: #6c757d;
+        font-size: 0.6rem;
+        font-weight: 600;
+        line-height: 1;
+        text-transform: none;
+        white-space: nowrap;
+    }
     
     /* Ensure dropdown doesn't overflow */
     .table-responsive {
@@ -520,9 +559,12 @@
                                         <th style="width: 40px;">#</th>
                                         <th style="width: 180px;">Item & Bagian</th>
                                         <th style="width: 200px;">Instruksi</th>
-                                        <th style="width: 180px;">Hasil</th>
+                                        <th style="width: 220px;">Hasil</th>
                                         <th style="width: 130px;">Waktu & User</th>
-                                        <th style="width: 200px;">Tindakan (Action)</th>
+                                        <th style="width: 220px;">
+                                            Tindakan / Keterangan
+                                            <span class="column-note">* Keterangan = Hasil Pengecekan</span>
+                                        </th>
                                         <th style="width: 200px;">Selanjutnya (Next)</th>
                                         <th style="width: 140px;">Foto</th>
                                         <th style="width: 70px;">
@@ -575,21 +617,21 @@
                                         </td>
 
                                         {{-- Condition Result --}}
-                                        <td>
-                                            @if($pmCheck->status == 'in_progress' && (Auth::user()->isMTC() || Auth::user()->isAdmin()))
+                                        <td class="pm-result-cell">
+                                            @if($pmCheck->status == 'in_progress' && (Auth::user()->isMTC() || Auth::user()->isAdmin() || Auth::user()->isGA()))
                                                 <select name="items[{{ $item->id }}][condition]" 
                                                         class="form-select condition-select select2-searchable" 
                                                         id="condition-{{ $item->id }}">
                                                     <option value="" {{ empty($item->condition) ? 'selected' : '' }}>-- Pilih Hasil --</option>
                                                     
-                                                    <optgroup label="✅ Kondisi Normal">
+                                                    <optgroup label="Kondisi Normal">
                                                         <option value="Berfungsi" {{ $item->condition == 'Berfungsi' ? 'selected' : '' }}>Berfungsi</option>
                                                         <option value="Normal" {{ $item->condition == 'Normal' ? 'selected' : '' }}>Normal</option>
                                                         <option value="Bersih" {{ $item->condition == 'Bersih' ? 'selected' : '' }}>Bersih</option>
                                                         <option value="Tekanan OK" {{ $item->condition == 'Tekanan OK' ? 'selected' : '' }}>Tekanan OK</option>
                                                     </optgroup>
 
-                                                    <optgroup label="📊 Parameter Teknis">
+                                                    <optgroup label="Parameter Teknis">
                                                         <option value="< 15 mm" {{ $item->condition == '< 15 mm' ? 'selected' : '' }}>< 15 mm</option>
                                                         <option value="< 3 Bar" {{ $item->condition == '< 3 Bar' ? 'selected' : '' }}>< 3 Bar</option>
                                                         <option value="> 2 Ohm" {{ $item->condition == '> 2 Ohm' ? 'selected' : '' }}>> 2 Ohm</option>
@@ -600,7 +642,7 @@
                                                         <option value="Tidak diantara 1,5 - 2,5 Bar" {{ $item->condition == 'Tidak diantara 1,5 - 2,5 Bar' ? 'selected' : '' }}>Tidak diantara 1,5 - 2,5 Bar</option>
                                                     </optgroup>
 
-                                                    <optgroup label="⚠️ Temuan Masalah">
+                                                    <optgroup label="Temuan Masalah">
                                                         <option value="Aus" {{ $item->condition == 'Aus' ? 'selected' : '' }}>Aus</option>
                                                         <option value="Bergetar" {{ $item->condition == 'Bergetar' ? 'selected' : '' }}>Bergetar</option>
                                                         <option value="Bocor" {{ $item->condition == 'Bocor' ? 'selected' : '' }}>Bocor</option>
@@ -615,7 +657,7 @@
                                                         <option value="Sedang dalam perbaikan" {{ $item->condition == 'Sedang dalam perbaikan' ? 'selected' : '' }}>Sedang dalam perbaikan</option>
                                                     </optgroup>
 
-                                                    <option value="Tulis Kondisinya" {{ $item->condition == 'Tulis Kondisinya' ? 'selected' : '' }}>✍️ Tulis Kondisinya...</option>
+                                                    <option value="Tulis Kondisinya" {{ $item->condition == 'Tulis Kondisinya' ? 'selected' : '' }}>Tulis Kondisinya...</option>
                                                 </select>
                                             @else
                                                 <span class="badge {{ in_array($item->condition, ['Normal', 'Berfungsi', 'Bersih', 'Tekanan OK']) ? 'bg-success' : 'bg-secondary' }} text-white">
@@ -645,7 +687,7 @@
                                                 name="items[{{ $item->id }}][action_taken]" 
                                                 class="form-control" 
                                                 rows="3" 
-                                                placeholder="Tindakan yang dilakukan..."
+                                                placeholder="Tindakan atau keterangan hasil pengecekan..."
                                                 {{ ($pmCheck->status != 'in_progress' && !Auth::user()->isAdmin()) ? 'disabled' : '' }}
                                             >{{ $item->action_taken }}</textarea>
                                         </td>
@@ -673,7 +715,7 @@
                                             @endif
 
                                             {{-- Camera Input --}}
-                                            @if($pmCheck->status == 'in_progress' && (Auth::user()->isMTC() || Auth::user()->isAdmin()))
+                                            @if($pmCheck->status == 'in_progress' && (Auth::user()->isMTC() || Auth::user()->isAdmin() || Auth::user()->isGA()))
                                                 <label for="camera-{{ $item->id }}" 
                                                        class="camera-label" 
                                                        id="label-{{ $item->id }}">
@@ -742,7 +784,7 @@
                                             </button>
                                         @endif
 
-                                        @if($pmCheck->status == 'in_progress' && (Auth::user()->isMTC() || Auth::user()->isAdmin()))
+                                        @if($pmCheck->status == 'in_progress' && (Auth::user()->isMTC() || Auth::user()->isAdmin() || Auth::user()->isGA()))
                                             <form method="POST"
                                                   action="{{ route('pm-checks.complete', $pmCheck->id) }}"
                                                   class="d-inline"
@@ -785,7 +827,7 @@ $(document).ready(function() {
     $('.select2-searchable').select2({
         theme: 'bootstrap-5',
         placeholder: '-- Pilih Hasil --',
-        allowClear: true,
+        allowClear: false,
         width: '100%',
         dropdownParent: $('body'),
         language: {

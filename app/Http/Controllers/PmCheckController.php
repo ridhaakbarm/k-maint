@@ -438,16 +438,14 @@ public function batchUpdateItems(Request $request, $checkId)
      */
     public function complete($id)
 {
-    $pmCheck = PmCheck::with('pmSchedule')->where('id', $id)
-        ->where(function($query) {
-            $query->where('technician_id', Auth::id())
-                  ->orWhere(fn($q) => Auth::user()->isAdmin());
-        })
-        ->where('status', 'in_progress')
-        ->where(function($query) {
-            $query->where('technician_id', Auth::id())
-                  ->orWhere(fn($q) => Auth::user()->isAdmin());
-        })
+    $user = Auth::user();
+
+    if (!($user->isMTC() || $user->isAdmin() || $user->isGA())) {
+        abort(403, 'Akses ditolak.');
+    }
+
+    $pmCheck = PmCheck::with('pmSchedule')
+        ->where('id', $id)
         ->where('status', 'in_progress')
         ->firstOrFail();
 

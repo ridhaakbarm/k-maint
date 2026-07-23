@@ -13,13 +13,7 @@
             <a href="{{ route('export.pm', ['start_date' => $dateFrom, 'end_date' => $dateTo]) }}" class="btn btn-success">
                 <i class="fas fa-file-excel me-1"></i> Export Detail PM
             </a>
-            <a href="{{ route('export.manager-report', [
-                'date_from' => $dateFrom,
-                'date_to' => $dateTo,
-                'technician_id' => $technicianId
-            ]) }}" class="btn btn-primary">
-                <i class="fas fa-chart-bar me-1"></i> Export Laporan Efektivitas
-            </a>
+            <!-- Removed Laporan Efektivitas link since technicianId is removed from filters -->
         </div>
     </div>
 
@@ -29,43 +23,29 @@
         </div>
         <div class="card-body">
             <form method="GET" action="{{ route('monitoring.pm') }}">
-                <div class="row g-3 align-items-end">
-                    <div class="col-md-2">
+                                <div class="row g-3 align-items-end">
+                    <div class="col-md-3">
                         <label class="form-label fw-bold small">Periode</label>
-                        <select name="period" class="form-select" onchange="this.form.submit()">
-                            <option value="daily" {{ $period === 'daily' ? 'selected' : '' }}>Harian</option>
-                            <option value="weekly" {{ $period === 'weekly' ? 'selected' : '' }}>Mingguan</option>
-                            <option value="monthly" {{ $period === 'monthly' ? 'selected' : '' }}>Bulanan</option>
+                        <select name="period" class="form-select" onchange="toggleFilterFields()">
+                            <option value="monthly" {{ $period === 'monthly' ? 'selected' : '' }}>Bulan Spesifik</option>
                             <option value="custom" {{ $period === 'custom' ? 'selected' : '' }}>Custom Range</option>
                         </select>
                     </div>
-                    <div class="col-md-3">
+                    
+                    <!-- Pilihan Bulan -->
+                    <div class="col-md-3" id="monthFilterContainer" style="{{ $period === 'monthly' ? '' : 'display:none;' }}">
+                        <label class="form-label fw-bold small">Pilih Bulan</label>
+                        <input type="month" name="filter_month" class="form-control" value="{{ $filterMonth ?? now()->format('Y-m') }}">
+                    </div>
+
+                    <!-- Custom Range -->
+                    <div class="col-md-4" id="customDateFilter" style="{{ $period === 'custom' ? '' : 'display:none;' }}">
                         <label class="form-label fw-bold small">Range Tanggal</label>
                         <div class="input-group">
                             <input type="date" name="date_from" class="form-control" value="{{ $dateFrom }}">
                             <span class="input-group-text">s/d</span>
                             <input type="date" name="date_to" class="form-control" value="{{ $dateTo }}">
                         </div>
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label fw-bold small">Tipe Jadwal</label>
-                        <select name="schedule_type" class="form-select">
-                            <option value="all" {{ $scheduleType === 'all' ? 'selected' : '' }}>Semua Tipe</option>
-                            @foreach(['daily' => 'Daily', 'weekly' => 'Weekly', 'monthly' => 'Monthly', 'quarterly' => 'Quarterly', 'yearly' => 'Yearly'] as $key => $label)
-                                <option value="{{ $key }}" {{ $scheduleType === $key ? 'selected' : '' }}>{{ $label }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label fw-bold small">Teknisi</label>
-                        <select name="technician_id" class="form-select">
-                            <option value="all" {{ $technicianId === 'all' ? 'selected' : '' }}>Semua Teknisi</option>
-                            @foreach($technicians as $technician)
-                                <option value="{{ $technician->id }}" {{ (string) $technicianId === (string) $technician->id ? 'selected' : '' }}>
-                                    {{ $technician->name }}
-                                </option>
-                            @endforeach
-                        </select>
                     </div>
                     <div class="col-md-2 d-grid">
                         <button type="submit" class="btn btn-primary">
@@ -79,12 +59,12 @@
 
     <div class="row g-3 mb-4">
         @foreach([
-            ['label' => 'Total PM', 'value' => $statusSummary['total'], 'icon' => 'fa-clipboard-list', 'class' => 'primary text-white'],
-            ['label' => 'Belum Usai', 'value' => $statusSummary['belum_usai'], 'icon' => 'fa-hourglass-half', 'class' => 'warning text-dark'],
-            ['label' => 'Selesai', 'value' => $statusSummary['selesai'], 'icon' => 'fa-check-circle', 'class' => 'success text-white'],
-            ['label' => 'Closed', 'value' => $statusSummary['closed'], 'icon' => 'fa-lock', 'class' => 'dark text-white'],
-            ['label' => 'Overdue', 'value' => $statusSummary['overdue'], 'icon' => 'fa-exclamation-triangle', 'class' => 'danger text-white'],
-            ['label' => 'Butuh Verifikasi', 'value' => $statusSummary['waiting_verification'], 'icon' => 'fa-user-check', 'class' => 'info text-dark'],
+            ['label' => 'Total Item Terjadwal', 'value' => $statusSummary['total_target'], 'icon' => 'fa-clipboard-list', 'class' => 'primary text-white'],
+            ['label' => 'Item Dikerjakan', 'value' => $statusSummary['done'], 'icon' => 'fa-check-circle', 'class' => 'success text-white'],
+            ['label' => 'Belum Dikerjakan', 'value' => $statusSummary['not_done'], 'icon' => 'fa-hourglass-half', 'class' => 'warning text-dark'],
+            ['label' => 'Item Temuan (Not OK)', 'value' => $statusSummary['not_ok'], 'icon' => 'fa-exclamation-triangle', 'class' => 'danger text-white'],
+            ['label' => 'Total Mesin (Asset PM)', 'value' => $statusSummary['total_machines'], 'icon' => 'fa-cogs', 'class' => 'dark text-white'],
+            ['label' => 'Progress Keseluruhan', 'value' => $statusSummary['progress'] . '%', 'icon' => 'fa-percentage', 'class' => 'info text-dark'],
         ] as $card)
         <div class="col-md-2 col-sm-6">
             <div class="card border-0 shadow-sm bg-{{ $card['class'] }} h-100">
@@ -92,7 +72,7 @@
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <div class="small fw-bold opacity-75">{{ $card['label'] }}</div>
-                            <h2 class="fw-bold mb-0">{{ $card['value'] }}</h2>
+                            <h3 class="fw-bold mb-0">{{ $card['value'] }}</h3>
                         </div>
                         <i class="fas {{ $card['icon'] }} fa-2x opacity-50"></i>
                     </div>
@@ -104,8 +84,8 @@
 
     <div class="card shadow-sm mb-4 border-info">
         <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
-            <span><i class="fas fa-tasks me-2 text-info"></i>Rincian Item PM</span>
-            <small class="text-muted">Target item terjadwal vs item dikerjakan</small>
+            <span><i class="fas fa-tasks me-2 text-info"></i>Rincian Item PM Keseluruhan Sistem</span>
+            <small class="text-muted">Target item terjadwal vs item dikerjakan (Live)</small>
         </div>
         <div class="card-body">
             <div class="row g-3">
@@ -118,7 +98,7 @@
                         $summary = $pmItemPeriodSummary[$summaryCard['key']] ?? ['target' => 0, 'done' => 0, 'progress' => 0];
                     @endphp
                     <div class="col-lg-4">
-                        <div class="pm-item-summary-box border-{{ $summaryCard['class'] }}">
+                        <div class="pm-item-summary-box border-{{ $summaryCard['class'] }} p-3 border rounded">
                             <div class="d-flex justify-content-between align-items-start mb-3">
                                 <div>
                                     <div class="text-muted small fw-bold text-uppercase">{{ $summaryCard['title'] }}</div>
@@ -144,116 +124,94 @@
         </div>
     </div>
 
-    <div class="card shadow-sm mb-4 border-primary">
-        <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
-            <span><i class="fas fa-calendar-day me-2 text-primary"></i>Planning PM Hari Ini & Bulan Berjalan</span>
-            <small class="text-muted">{{ now()->format('d/m/Y') }}</small>
+    <!-- Per-Machine Progress Section -->
+    <div class="card shadow-sm mb-4 border-success">
+        <div class="card-header bg-white fw-bold">
+            <i class="fas fa-industry me-2 text-success"></i>Progress PM per Mesin (Asset)
         </div>
-        <div class="card-body">
-            <div class="row g-3">
-                <div class="col-md-2 col-sm-6">
-                    <div class="monitor-mini-box border-primary">
-                        <div class="text-muted small fw-bold">PM Aktif Bulan Ini</div>
-                        <div class="h3 fw-bold mb-0 text-primary">{{ $activeMonthSchedules->count() }}</div>
-                        <small class="text-muted">jadwal aktif</small>
-                    </div>
-                </div>
-                <div class="col-md-2 col-sm-6">
-                    <div class="monitor-mini-box border-dark">
-                        <div class="text-muted small fw-bold">Terjadwal Hari Ini</div>
-                        <div class="h3 fw-bold mb-0 text-dark">{{ $todaySummary['scheduled'] }}</div>
-                        <small class="text-muted">PM due hari ini</small>
-                    </div>
-                </div>
-                <div class="col-md-2 col-sm-6">
-                    <div class="monitor-mini-box border-danger">
-                        <div class="text-muted small fw-bold">Belum Dilakukan</div>
-                        <div class="h3 fw-bold mb-0 text-danger">{{ $todaySummary['not_started'] }}</div>
-                        <small class="text-muted">belum ada checklist</small>
-                    </div>
-                </div>
-                <div class="col-md-2 col-sm-6">
-                    <div class="monitor-mini-box border-warning">
-                        <div class="text-muted small fw-bold">Sedang Proses</div>
-                        <div class="h3 fw-bold mb-0 text-warning">{{ $todaySummary['in_progress'] }}</div>
-                        <small class="text-muted">pending/progress/verif</small>
-                    </div>
-                </div>
-                <div class="col-md-2 col-sm-6">
-                    <div class="monitor-mini-box border-success">
-                        <div class="text-muted small fw-bold">Sudah Dilakukan</div>
-                        <div class="h3 fw-bold mb-0 text-success">{{ $todaySummary['done'] }}</div>
-                        <small class="text-muted">selesai/closed</small>
-                    </div>
-                </div>
-                <div class="col-md-2 col-sm-6">
-                    <div class="monitor-mini-box border-info">
-                        <div class="text-muted small fw-bold">Tindakan Selanjutnya</div>
-                        <div class="h3 fw-bold mb-0 text-info">{{ $followUpSummary['total'] }}</div>
-                        <small class="text-muted">{{ $followUpSummary['open'] }} open, {{ $followUpSummary['ok'] }} OK</small>
-                    </div>
-                </div>
+        <div class="card-body p-0">
+            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                <table class="table table-hover table-striped mb-0 align-middle">
+                    <thead class="table-light sticky-top">
+                        <tr>
+                            <th class="ps-3">Nama Mesin (Asset)</th>
+                            <th class="text-center">Total Item Terjadwal</th>
+                            <th class="text-center">Item Dikerjakan</th>
+                            <th class="text-center">Belum Dikerjakan</th>
+                            <th style="width: 250px;">Progress</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($assetProgress as $asset)
+                        <tr>
+                            <td class="ps-3 fw-bold">{{ $asset['asset_name'] }}</td>
+                            <td class="text-center">{{ $asset['target'] }}</td>
+                            <td class="text-center text-success fw-bold">{{ $asset['done'] }}</td>
+                            <td class="text-center text-danger fw-bold">{{ $asset['not_done'] }}</td>
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="progress flex-grow-1" style="height: 12px;">
+                                        <div class="progress-bar bg-{{ $asset['progress'] == 100 ? 'success' : ($asset['progress'] >= 50 ? 'primary' : 'warning') }}" style="width: {{ min($asset['progress'], 100) }}%"></div>
+                                    </div>
+                                    <span class="small fw-bold">{{ $asset['progress'] }}%</span>
+                                </div>
+                            </td>
+                        </tr>
+                        @empty
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-4">Tidak ada data mesin dengan jadwal PM di periode ini.</td>
+                        </tr>
+                        @endforelse
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
 
     <div class="row g-4 mb-4">
-        <div class="col-lg-4">
-            <div class="card shadow-sm h-100">
-                <div class="card-header bg-white fw-bold">
-                    <i class="fas fa-tasks me-2 text-primary"></i>Progress Item Checklist
-                </div>
-                <div class="card-body">
-                    <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">Item selesai</span>
-                        <strong>{{ $statusSummary['done_items'] }}/{{ $statusSummary['total_items'] }}</strong>
-                    </div>
-                    <div class="progress mb-3" style="height: 14px;">
-                        <div class="progress-bar bg-success" style="width: {{ $statusSummary['progress'] }}%"></div>
-                    </div>
-                    <div class="d-flex justify-content-between">
-                        <span class="badge bg-success">{{ $statusSummary['progress'] }}% complete</span>
-                        <span class="badge bg-danger">{{ $statusSummary['not_ok_items'] }} temuan Not OK</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-lg-8">
-            <div class="card shadow-sm h-100">
-                <div class="card-header bg-white fw-bold">
-                    <i class="fas fa-layer-group me-2 text-primary"></i>Breakdown Tipe Jadwal
+        <!-- Technician Performance -->
+        <div class="col-12">
+            <div class="card shadow-sm h-100 border-dark">
+                <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-users-cog me-2 text-dark"></i>Performa Teknisi PM</span>
+                    <span class="badge bg-dark">{{ $technicianPerformance->count() }} Teknisi Aktif</span>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-hover mb-0 align-middle">
+                        <table class="table table-hover align-middle mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th class="ps-3">Tipe</th>
-                                    <th class="text-center">Total</th>
-                                    <th class="text-center">Done/Closed</th>
-                                    <th class="text-center">Belum Usai</th>
-                                    <th style="width: 220px;">Rate</th>
+                                    <th class="ps-3">Teknisi</th>
+                                    <th class="text-center">Total Item Dikerjakan</th>
+                                    <th class="text-center">Waktu Pengerjaan (Jam)</th><th class="text-end">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                @forelse($scheduleTypeSummary as $row)
+                                @forelse($technicianPerformance as $perf)
                                 <tr>
-                                    <td class="ps-3 fw-bold">{{ strtoupper($row['type']) }}</td>
-                                    <td class="text-center">{{ $row['total'] }}</td>
-                                    <td class="text-center text-success fw-bold">{{ $row['done'] }}</td>
-                                    <td class="text-center text-danger fw-bold">{{ $row['open'] }}</td>
-                                    <td>
+                                    <td class="ps-3">
                                         <div class="d-flex align-items-center gap-2">
-                                            <div class="progress flex-grow-1" style="height: 10px;">
-                                                <div class="progress-bar bg-primary" style="width: {{ $row['rate'] }}%"></div>
+                                            <div class="avatar-placeholder bg-light rounded-circle text-primary fw-bold d-flex align-items-center justify-content-center" style="width: 35px; height: 35px;">
+                                                {{ substr($perf['technician']->name, 0, 1) }}
                                             </div>
-                                            <span class="small fw-bold">{{ $row['rate'] }}%</span>
+                                            <div>
+                                                <div class="fw-bold">{{ $perf['technician']->name }}</div>
+                                                <div class="small text-muted">{{ $perf['technician']->department }}</div>
+                                            </div>
                                         </div>
+                                    </td>
+                                    <td class="text-center h5 mb-0 text-primary fw-bold">{{ $perf['done_items'] }}</td>
+                                    <td class="text-center text-dark fw-bold">{{ $perf['pm_hours'] }} Jam</td>
+                                    <td class="text-end">
+                                        <a href="{{ route('export.technician-pm-items', ['technician_id' => $perf['technician']->id, 'start_date' => $dateFrom, 'end_date' => $dateTo]) }}" class="btn btn-sm btn-outline-success" title="Download Excel Data Item yang Dikerjakan">
+                                            <i class="fas fa-file-excel"></i>
+                                        </a>
                                     </td>
                                 </tr>
                                 @empty
-                                <tr><td colspan="5" class="text-center text-muted py-4">Belum ada data PM di periode ini.</td></tr>
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted py-4">Tidak ada performa teknisi PM untuk periode ini.</td>
+                                </tr>
                                 @endforelse
                             </tbody>
                         </table>
@@ -262,108 +220,85 @@
             </div>
         </div>
     </div>
+</div>
 
-    <div class="card shadow-sm mb-4">
-        <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
-            <span><i class="fas fa-user-cog me-2 text-primary"></i>Performance Teknisi PM</span>
-            <small class="text-muted">Diurutkan dari progress item tertinggi</small>
-        </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover mb-0 align-middle">
-                    <thead class="table-light">
-                        <tr>
-                            <th class="ps-3">Teknisi</th>
-                            <th class="text-center">Assigned</th>
-                            <th class="text-center">Selesai</th>
-                            <th class="text-center">Closed</th>
-                            <th class="text-center">Belum Usai</th>
-                            <th class="text-center">Item</th>
-                            <th class="text-center">Not OK</th>
-                            <th class="text-center">Jam PM</th>
-                            <th style="width: 220px;">Item Rate</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse($technicianPerformance as $row)
-                        <tr>
-                            <td class="ps-3">
-                                <strong>{{ $row['technician']->name }}</strong>
-                                <small class="text-muted d-block">{{ strtoupper($row['technician']->role) }}</small>
-                            </td>
-                            <td class="text-center fw-bold">{{ $row['assigned'] }}</td>
-                            <td class="text-center text-success fw-bold">{{ $row['completed'] }}</td>
-                            <td class="text-center text-dark fw-bold">{{ $row['closed'] }}</td>
-                            <td class="text-center text-danger fw-bold">{{ $row['not_finished'] }}</td>
-                            <td class="text-center">{{ $row['done_items'] }}/{{ $row['total_items'] }}</td>
-                            <td class="text-center">
-                                <span class="badge bg-{{ $row['not_ok_items'] > 0 ? 'danger' : 'secondary' }}">{{ $row['not_ok_items'] }}</span>
-                            </td>
-                            <td class="text-center">{{ $row['pm_hours'] }}</td>
-                            <td>
-                                <div class="d-flex align-items-center gap-2">
-                                    <div class="progress flex-grow-1" style="height: 10px;">
-                                        <div class="progress-bar bg-success" style="width: {{ $row['item_rate'] }}%"></div>
-                                    </div>
-                                    <span class="small fw-bold">{{ $row['item_rate'] }}%</span>
-                                </div>
-                            </td>
-                        </tr>
-                        @empty
-                        <tr><td colspan="9" class="text-center text-muted py-4">Belum ada pekerjaan PM teknisi pada periode ini.</td></tr>
-                        @endforelse
-                    </tbody>
-                </table>
+<!-- Tab Tambahan -->
+<div class="row g-4 mb-4">
+    <div class="col-lg-6">
+        <div class="card shadow-sm h-100 border-danger">
+            <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-exclamation-triangle me-2 text-danger"></i>PM Overdue (10 Terlama)</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-3">Jadwal PM</th>
+                                <th>Due Date</th>
+                                <th class="text-center">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($overdueChecks as $check)
+                            <tr>
+                                <td class="ps-3 fw-bold">{{ $check->pmSchedule->name ?? '-' }}<br><small class="text-muted">{{ $check->pmSchedule->asset->name ?? '-' }}</small></td>
+                                <td class="text-danger fw-bold">{{ \Carbon\Carbon::parse($check->due_date)->format('d M Y') }}</td>
+                                <td class="text-center"><span class="badge bg-danger">{{ $check->status }}</span></td>
+                            </tr>
+                            @empty
+                            <tr>
+                                <td colspan="3" class="text-center text-muted py-4">Tidak ada jadwal PM overdue.</td>
+                            </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
-
-    <div class="row g-4">
-        <div class="col-lg-4">
-            @include('monitoring.partials.pm-list', [
-                'title' => 'PM Overdue',
-                'icon' => 'fa-exclamation-triangle',
-                'color' => 'danger',
-                'items' => $overdueChecks,
-                'empty' => 'Tidak ada PM overdue.'
-            ])
-        </div>
-        <div class="col-lg-4">
-            @include('monitoring.partials.pm-list', [
-                'title' => 'Menunggu Verifikasi',
-                'icon' => 'fa-user-check',
-                'color' => 'info',
-                'items' => $needVerificationChecks,
-                'empty' => 'Tidak ada PM menunggu verifikasi.'
-            ])
-        </div>
-        <div class="col-lg-4">
-            @include('monitoring.partials.pm-list', [
-                'title' => 'Terakhir Selesai',
-                'icon' => 'fa-check-double',
-                'color' => 'success',
-                'items' => $recentFinishedChecks,
-                'empty' => 'Belum ada PM selesai di periode ini.'
-            ])
+    <div class="col-lg-6">
+        <div class="card shadow-sm h-100 border-warning">
+            <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-user-check me-2 text-warning"></i>Butuh Verifikasi Admin</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-3">Jadwal PM</th>
+                                <th>Update Terakhir</th>
+                                <th class="text-center">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($needVerificationChecks as $check)
+                            <tr>
+                                <td class="ps-3 fw-bold">{{ $check->pmSchedule->name ?? '-' }}<br><small class="text-muted">{{ $check->pmSchedule->asset->name ?? '-' }}</small></td>
+                                <td>{{ $check->updated_at->diffForHumans() }}</td>
+                                <td class="text-center">
+                                    <a href="{{ route('pm.execution.show', $check->id) }}" class="btn btn-sm btn-primary">Review</a>
+                                </td>
+                            </tr>
+                            @empty
+                            <tr>
+                                <td colspan="3" class="text-center text-muted py-4">Tidak ada PM yang menunggu verifikasi.</td>
+                            </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 </div>
-<style>
-    .monitor-mini-box {
-        border-left: 4px solid;
-        background: #fff;
-        border-radius: 6px;
-        padding: 14px 16px;
-        height: 100%;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-    }
-    .pm-item-summary-box {
-        border-left: 4px solid;
-        background: #fff;
-        border-radius: 6px;
-        padding: 16px;
-        height: 100%;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-    }
-</style>
+
+<script>
+function toggleFilterFields() {
+    var period = document.querySelector('select[name="period"]').value;
+    document.getElementById('monthFilterContainer').style.display = (period === 'monthly') ? '' : 'none';
+    document.getElementById('customDateFilter').style.display = (period === 'custom') ? '' : 'none';
+}
+</script>
 @endsection
