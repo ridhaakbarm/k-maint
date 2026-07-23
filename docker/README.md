@@ -20,6 +20,7 @@ APP_ENV=production
 APP_KEY=base64:change-this-with-a-real-laravel-key
 APP_DEBUG=false
 APP_URL=https://your-domain.com
+FORCE_HTTPS=true
 
 DB_CONNECTION=mysql
 DB_HOST=your-mysql-host
