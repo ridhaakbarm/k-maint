@@ -207,6 +207,7 @@
                                     <tr>
                                         <th style="width: 50px;">#</th>
                                         <th style="width: 200px;">Item & Bagian</th>
+                                        <th style="width: 150px;">Kondisi Pemeriksaan</th>
                                         <th style="width: 250px;">Instruksi Pengecekan</th>
                                         <th style="width: 150px;">Standard</th>
                                         <th>{{ $schedule->schedule_type === 'daily' ? 'Periode' : 'Week Aktif' }}</th>
@@ -229,6 +230,14 @@
                                                     <i class="fas fa-puzzle-piece me-1"></i>
                                                     {{ $template->checked_part }}
                                                 </div>
+                                            </td>
+
+                                            {{-- Inspection Condition --}}
+                                            <td>
+                                                <span class="standard-badge">
+                                                    <i class="fas fa-power-off me-1"></i>
+                                                    {{ $template->inspection_condition ?? '-' }}
+                                                </span>
                                             </td>
 
                                             {{-- Instructions --}}

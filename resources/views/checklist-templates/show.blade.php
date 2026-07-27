@@ -21,6 +21,7 @@
                     </tr>
                     <tr><th class="bg-light">Item Checklist</th><td>{{ $checklistTemplate->item_name }}</td></tr>
                     <tr><th class="bg-light">Bagian yang Dicek</th><td>{{ $checklistTemplate->checked_part }}</td></tr>
+                    <tr><th class="bg-light">Kondisi Pemeriksaan</th><td>{{ $checklistTemplate->inspection_condition ?? '-' }}</td></tr>
                     <tr><th class="bg-light">Instruksi</th><td>{{ $checklistTemplate->instructions }}</td></tr>
                     <tr><th class="bg-light">Standar Pengecekan</th><td>{{ $checklistTemplate->check_standard }}</td></tr>
                     <tr><th class="bg-light">Urutan</th><td>{{ $checklistTemplate->order }}</td></tr>

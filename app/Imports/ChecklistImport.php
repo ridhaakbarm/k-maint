@@ -33,6 +33,7 @@ class ChecklistImport implements ToModel, WithHeadingRow
             'pm_schedule_id' => $this->pm_schedule_id,
             'item_name'      => $row['item_name'] ?? 'Tanpa Nama',
             'checked_part'   => $row['checked_part'] ?? '-',
+            'inspection_condition' => $row['inspection_condition'] ?? 'Running / Off',
             'instructions'   => $row['instructions'] ?? '-',
             'check_standard' => $row['check_standard'] ?? '-',
             'order'          => isset($row['order']) ? (int)$row['order'] : 0,

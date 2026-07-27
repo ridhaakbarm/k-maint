@@ -109,4 +109,5 @@
     .badge { font-weight: 600; padding: 0.5em 0.8em; }
     .pm-type-summary { background: #f8f9fa; border-radius: 8px; padding: 14px 16px; }
 </style>
+
 @endsection

@@ -610,6 +610,10 @@
                                             <div class="instruction-box">
                                                 {{ $item->checklistTemplate->instructions }}
                                             </div>
+                                            <div class="standard-badge mb-1">
+                                                <i class="fas fa-power-off me-1"></i>
+                                                Kondisi: {{ $item->checklistTemplate->inspection_condition ?? '-' }}
+                                            </div>
                                             <div class="standard-badge">
                                                 <i class="fas fa-ruler me-1"></i>
                                                 Std: {{ $item->checklistTemplate->check_standard }}

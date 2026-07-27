@@ -38,6 +38,19 @@
                     </div>
 
                     <div class="mb-3">
+                        <label class="form-label fw-bold">Kondisi Pemeriksaan *</label>
+                        <select class="form-select @error('inspection_condition') is-invalid @enderror" name="inspection_condition" required>
+                            <option value="">-- Pilih Kondisi --</option>
+                            <option value="Running" {{ old('inspection_condition') === 'Running' ? 'selected' : '' }}>Running</option>
+                            <option value="Off" {{ old('inspection_condition') === 'Off' ? 'selected' : '' }}>Off</option>
+                            <option value="Running / Off" {{ old('inspection_condition') === 'Running / Off' ? 'selected' : '' }}>Running / Off</option>
+                        </select>
+                        @error('inspection_condition')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+
+                    <div class="mb-3">
                         <label class="form-label fw-bold">Instruksi Pengecekan *</label>
                         <textarea class="form-control" name="instructions" rows="2" required>{{ old('instructions') }}</textarea>
                     </div>

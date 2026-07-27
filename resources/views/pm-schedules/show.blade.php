@@ -109,13 +109,31 @@
             </div>
             
             <div class="card-body p-0">
+                <form action="{{ route('pm.templates.bulk-destroy') }}" method="POST" id="bulkDeleteChecklistForm" class="d-none">
+                    @csrf
+                    <div id="bulkDeleteChecklistInputs"></div>
+                </form>
+
+                <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom bg-light">
+                    <div class="text-muted small">
+                        <span id="selectedChecklistCount">0</span> item dipilih
+                    </div>
+                    <button type="button" class="btn btn-danger btn-sm" id="bulkDeleteChecklistButton" disabled>
+                        <i class="fas fa-trash-alt me-1"></i> Hapus Item Terpilih
+                    </button>
+                </div>
+
                 <div class="table-responsive">
                     <table class="table table-hover table-striped mb-0">
                         <thead class="table-light">
                             <tr>
+                                <th width="50" class="text-center">
+                                    <input type="checkbox" class="form-check-input" id="selectAllChecklistItems" title="Pilih semua item checklist">
+                                </th>
                                 <th width="60" class="text-center">Urutan</th>
                                 <th>Item Checklist</th>
                                 <th>Bagian</th>
+                                <th>Kondisi Pemeriksaan</th>
                                 <th>Minggu Aktif</th>
                                 <th width="100" class="text-center">Status</th>
                                 <th width="80" class="text-center">Aksi</th>
@@ -124,6 +142,9 @@
                         <tbody>
                             @forelse($pmSchedule->checklistTemplates->sortBy('order') as $template)
                             <tr>
+                                <td class="text-center">
+                                    <input type="checkbox" class="form-check-input checklist-item-checkbox" value="{{ $template->id }}" aria-label="Pilih item {{ $template->item_name }}">
+                                </td>
                                 <td class="text-center">{{ $template->order }}</td>
                                 <td>
                                     <strong>{{ $template->item_name }}</strong>
@@ -131,6 +152,9 @@
                                     <small class="text-muted">{{ Str::limit($template->check_standard, 50) }}</small>
                                 </td>
                                 <td>{{ $template->checked_part }}</td>
+                                <td>
+                                    <span class="badge bg-primary">{{ $template->inspection_condition ?? '-' }}</span>
+                                </td>
                                 
                                 <td>
                                     @if(is_array($template->active_weeks))
@@ -168,7 +192,7 @@
                             </tr>
                             @empty
                             <tr>
-                                <td colspan="6" class="text-center py-5">
+                                <td colspan="8" class="text-center py-5">
                                     <div class="text-muted">
                                         <i class="fas fa-file-excel fa-3x mb-3 text-success"></i><br>
                                         <h5>Belum ada item checklist</h5>
@@ -241,7 +265,7 @@
                     <div class="alert alert-info small">
                         <i class="fas fa-info-circle me-1"></i> <strong>Panduan Format:</strong><br>
                         Gunakan header berikut pada baris pertama:<br>
-                        <code>item_name</code>, <code>checked_part</code>, <code>instructions</code>, <code>check_standard</code>, <code>weeks</code>
+                        <code>item_name</code>, <code>checked_part</code>, <code>inspection_condition</code>, <code>instructions</code>, <code>check_standard</code>, <code>weeks</code>
                     </div>
 
                     <div class="bg-light p-2 rounded border small">
@@ -262,3 +286,67 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const selectAll = document.getElementById('selectAllChecklistItems');
+    const checkboxes = Array.from(document.querySelectorAll('.checklist-item-checkbox'));
+    const selectedCount = document.getElementById('selectedChecklistCount');
+    const bulkButton = document.getElementById('bulkDeleteChecklistButton');
+    const bulkForm = document.getElementById('bulkDeleteChecklistForm');
+    const bulkInputs = document.getElementById('bulkDeleteChecklistInputs');
+
+    function selectedIds() {
+        return checkboxes.filter((checkbox) => checkbox.checked).map((checkbox) => checkbox.value);
+    }
+
+    function refreshBulkState() {
+        const ids = selectedIds();
+        selectedCount.textContent = ids.length;
+        bulkButton.disabled = ids.length === 0;
+
+        if (selectAll) {
+            selectAll.checked = checkboxes.length > 0 && ids.length === checkboxes.length;
+            selectAll.indeterminate = ids.length > 0 && ids.length < checkboxes.length;
+        }
+    }
+
+    if (selectAll) {
+        selectAll.addEventListener('change', function () {
+            checkboxes.forEach((checkbox) => {
+                checkbox.checked = selectAll.checked;
+            });
+            refreshBulkState();
+        });
+    }
+
+    checkboxes.forEach((checkbox) => checkbox.addEventListener('change', refreshBulkState));
+
+    bulkButton.addEventListener('click', function () {
+        const ids = selectedIds();
+        if (ids.length === 0) {
+            alert('Pilih minimal satu item checklist untuk dihapus.');
+            return;
+        }
+
+        if (!confirm(`Hapus ${ids.length} item checklist terpilih?`)) {
+            return;
+        }
+
+        bulkInputs.innerHTML = '';
+        ids.forEach((id) => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'template_ids[]';
+            input.value = id;
+            bulkInputs.appendChild(input);
+        });
+
+        bulkForm.submit();
+    });
+
+    refreshBulkState();
+});
+</script>
+@endpush

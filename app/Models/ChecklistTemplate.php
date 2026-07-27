@@ -10,7 +10,7 @@ class ChecklistTemplate extends Model
     use HasFactory;
 
     protected $fillable = [
-        'pm_schedule_id', 'item_name', 'checked_part', 'operation_source',
+        'pm_schedule_id', 'item_name', 'checked_part', 'inspection_condition', 'operation_source',
         'instructions', 'check_standard', 'order', 'is_active', 'active_weeks'
 
     ];

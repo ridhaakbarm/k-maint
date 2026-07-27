@@ -32,6 +32,7 @@
                             <th>Aset & Jadwal</th>
                             <th>Item Checklist</th>
                             <th>Bagian Dicek</th>
+                            <th>Kondisi Pemeriksaan</th>
                             <th>Instruksi</th>
                             <th>Standar</th>
                             <th>Minggu Aktif</th>
@@ -49,6 +50,7 @@
                             </td>
                             <td>{{ $template->item_name }}</td>
                             <td>{{ $template->checked_part }}</td>
+                            <td><span class="badge bg-primary">{{ $template->inspection_condition ?? '-' }}</span></td>
                             <td>{{ Str::limit($template->instructions, 50) }}</td>
                             <td>{{ Str::limit($template->check_standard, 50) }}</td>
                             <td>
@@ -77,7 +79,7 @@
                             </td>
                         </tr>
                         @empty
-                        <tr><td colspan="9" class="text-center py-4 text-muted">Data template kosong.</td></tr>
+                        <tr><td colspan="10" class="text-center py-4 text-muted">Data template kosong.</td></tr>
                         @endforelse
                     </tbody>
                 </table>

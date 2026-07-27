@@ -160,6 +160,7 @@ Route::middleware(['auth', 'admin'])->group(function () {
     Route::resource('pm-schedules', PmScheduleController::class)->names('pm.schedule');
     Route::post('pm-schedules/{pmSchedule}/toggle-status', [PmScheduleController::class, 'toggleStatus'])->name('pm.schedule.toggle-status');
     
+    Route::post('checklist-templates/bulk-delete', [ChecklistTemplateController::class, 'bulkDestroy'])->name('pm.templates.bulk-destroy');
     Route::resource('checklist-templates', ChecklistTemplateController::class)->names('pm.templates');
     Route::post('checklist-templates/import', [ChecklistTemplateController::class, 'import'])->name('pm.templates.import');
     Route::get('checklist-templates/by-schedule/{scheduleId}', [ChecklistTemplateController::class, 'getBySchedule'])->name('pm.templates.by-schedule');

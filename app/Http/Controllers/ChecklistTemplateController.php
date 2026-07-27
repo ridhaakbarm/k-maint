@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ChecklistTemplate;
+use App\Models\PmCheckItem;
 use App\Models\PmSchedule;
 use App\Models\Asset;
 use Illuminate\Http\Request;
@@ -22,7 +23,7 @@ class ChecklistTemplateController extends Controller
                 abort(403, 'Akses ditolak. Hanya Admin atau MTC yang diperbolehkan.');
             }
 
-            $restrictedMethods = ['create', 'store', 'edit', 'update', 'destroy', 'import', 'toggleStatus'];
+            $restrictedMethods = ['create', 'store', 'edit', 'update', 'destroy', 'bulkDestroy', 'import', 'toggleStatus'];
             if (in_array($request->route()->getActionMethod(), $restrictedMethods)) {
                 if ($user->username !== 'andre') {
                     abort(403, 'Akses ditolak. Hanya akun andre yang dapat mengedit template.');
@@ -66,6 +67,7 @@ class ChecklistTemplateController extends Controller
             'pm_schedule_id' => 'required|exists:pm_schedules,id',
             'item_name' => 'required|string|max:255',
             'checked_part' => 'required|string|max:255',
+            'inspection_condition' => 'required|in:Running,Off,Running / Off',
             'instructions' => 'required|string',
             'check_standard' => 'required|string',
             'order' => 'required|integer|min:0',
@@ -85,6 +87,7 @@ class ChecklistTemplateController extends Controller
             'pm_schedule_id' => $request->pm_schedule_id,
             'item_name' => $request->item_name,
             'checked_part' => $request->checked_part,
+            'inspection_condition' => $request->inspection_condition,
             'operation_source' => $request->operation_source,
             'instructions' => $request->instructions,
             'check_standard' => $request->check_standard,
@@ -114,6 +117,7 @@ class ChecklistTemplateController extends Controller
             'pm_schedule_id' => 'required|exists:pm_schedules,id',
             'item_name' => 'required|string|max:255',
             'checked_part' => 'required|string|max:255',
+            'inspection_condition' => 'required|in:Running,Off,Running / Off',
             'active_weeks' => 'nullable|array',
         ]);
 
@@ -130,6 +134,7 @@ class ChecklistTemplateController extends Controller
             'pm_schedule_id' => $request->pm_schedule_id,
             'item_name' => $request->item_name,
             'checked_part' => $request->checked_part,
+            'inspection_condition' => $request->inspection_condition,
             'operation_source' => $request->operation_source,
             'instructions' => $request->instructions,
             'check_standard' => $request->check_standard,
@@ -159,7 +164,37 @@ class ChecklistTemplateController extends Controller
 
         return back()->with('success', $message);
     }
-    public function export()
+    public function bulkDestroy(Request $request)
+    {
+        $validated = $request->validate([
+            'template_ids' => 'required|array|min:1',
+            'template_ids.*' => 'integer|exists:checklist_templates,id',
+        ], [
+            'template_ids.required' => 'Pilih minimal satu item checklist untuk dihapus.',
+            'template_ids.min' => 'Pilih minimal satu item checklist untuk dihapus.',
+        ]);
+
+        $templates = ChecklistTemplate::withCount('checkItems')
+            ->whereIn('id', $validated['template_ids'])
+            ->get();
+
+        $deletedTemplateCount = $templates->count();
+        $deletedItemCount = $templates->sum('check_items_count');
+
+        $templateIds = $templates->pluck('id');
+
+        PmCheckItem::whereIn('checklist_template_id', $templateIds)->delete();
+        ChecklistTemplate::whereIn('id', $templateIds)->delete();
+
+        $message = "{$deletedTemplateCount} item checklist berhasil dihapus.";
+        if ($deletedItemCount > 0) {
+            $message .= " {$deletedItemCount} data PM Check terkait juga dihapus.";
+        }
+
+        return back()->with('success', $message);
+    }
+
+    public function export()
     {
         return Excel::download(new ChecklistTemplateExport, 'checklist_templates.xlsx');
     }
