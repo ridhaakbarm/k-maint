@@ -203,8 +203,11 @@ class ChecklistTemplateController extends Controller
     public function import(Request $request)
     {
         $request->validate([
-            'file' => 'required|mimes:xlsx,xls,csv',
+            'file' => 'required|file|mimes:xlsx,xls,csv,txt|max:10240',
             'pm_schedule_id' => 'required|exists:pm_schedules,id',
+        ], [
+            'file.mimes' => 'File harus berupa format Excel (.xlsx, .xls) atau CSV.',
+            'file.required' => 'Pilih file Excel terlebih dahulu.',
         ]);
 
         try {
