@@ -68,6 +68,10 @@ class ExportController extends Controller
 
     public function exportPm(Request $request)
     {
+        $timeout = (int) config('exports.pm_timeout', 300);
+        @set_time_limit($timeout);
+        @ini_set('max_execution_time', (string) $timeout);
+
         $validated = $request->validate([
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',

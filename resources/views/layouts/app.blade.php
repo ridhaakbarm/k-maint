@@ -423,7 +423,7 @@
                         @if(Auth::user()->isTechnician())
                         <li class="nav-header text-uppercase">Technician Panel</li>
                         <li class="nav-item">
-                            <a href="http://192.168.2.100/k-maint/public/dashboard" class="nav-link">
+                            <a href="https://mtc.kasakata.cloud/dashboard" class="nav-link">
                                 <i class="fas fa-user-clock nav-icon text-warning"></i>
                                 <p>Dashboard Teknisi</p>
                             </a>
@@ -441,7 +441,7 @@
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a href="http://192.168.2.100/kasakata-cmb/public/machine-tracking" target="_blank" class="nav-link">
+                            <a href="https://cmb.kasakata.cloud/machine-tracking" target="_blank" class="nav-link">
                                 <i class="nav-icon fa-solid fa-tv"></i>
                                 <p>Machine Tracking (TV)</p>
                             </a>
