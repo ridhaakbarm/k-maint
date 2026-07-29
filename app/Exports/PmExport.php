@@ -8,7 +8,7 @@ use App\Models\PmSchedule;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromArray;
-use Maatwebsite\Excel\Concerns\FromCollection;
+use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
 use Maatwebsite\Excel\Concerns\WithMapping;
@@ -42,11 +42,10 @@ class PmExport implements WithMultipleSheets
     }
 }
 
-class PmActualItemsSheet implements FromCollection, WithHeadings, WithMapping, WithStyles, WithColumnWidths, WithTitle
+class PmActualItemsSheet implements FromQuery, WithHeadings, WithMapping, WithStyles, WithColumnWidths, WithTitle
 {
     protected Carbon $startDate;
     protected Carbon $endDate;
-    protected ?Collection $rows = null;
 
     public function __construct(Carbon $startDate, Carbon $endDate)
     {
@@ -59,9 +58,9 @@ class PmActualItemsSheet implements FromCollection, WithHeadings, WithMapping, W
         return 'Item Aktual';
     }
 
-    public function collection()
+    public function query()
     {
-        $query = PmCheckItem::with([
+        return PmCheckItem::query()->with([
             'checklistTemplate',
             'checkedBy',
             'verifiedBy',
@@ -92,8 +91,6 @@ class PmActualItemsSheet implements FromCollection, WithHeadings, WithMapping, W
             ->orderBy('pm_checks.week_number')
             ->orderBy('checklist_templates.order')
             ->select('pm_check_items.*');
-
-        return $this->rows = $query->get();
     }
 
     public function headings(): array
@@ -147,7 +144,7 @@ class PmActualItemsSheet implements FromCollection, WithHeadings, WithMapping, W
             $pmCheck->id ?? '-',
             $pmCheck->week_number ?? '-',
             PmExportData::scheduleTypeLabel($template->frequency_label ?? $schedule->schedule_type ?? null),
-            $schedule->asset->name ?? '-',
+            $schedule?->asset?->name ?? '-',
             $schedule->name ?? '-',
             $pmCheck->technician->name ?? $pmCheck->technician_name ?? '-',
             PmExportData::formatDate($pmCheck->check_date ?? null),
@@ -180,7 +177,7 @@ class PmActualItemsSheet implements FromCollection, WithHeadings, WithMapping, W
 
     public function styles(Worksheet $sheet)
     {
-        PmExportData::styleTable($sheet, ($this->rows ? $this->rows->count() : 0) + 1);
+        PmExportData::styleTable($sheet);
         $sheet->getStyle('C:E')->getAlignment()->setWrapText(true);
         $sheet->getStyle('O:AD')->getAlignment()->setWrapText(true);
         $sheet->getStyle('A:C')->getAlignment()->setHorizontal('center');
@@ -541,9 +538,10 @@ class PmExportData
             && (in_array($weekNumber, $activeWeeks) || in_array((string) $weekNumber, $activeWeeks));
     }
 
-    public static function styleTable(Worksheet $sheet, int $rowCount): void
+    public static function styleTable(Worksheet $sheet, ?int $rowCount = null): void
     {
         $lastColumn = $sheet->getHighestColumn();
+        $rowCount ??= $sheet->getHighestDataRow();
         $dataRange = 'A1:' . $lastColumn . $rowCount;
         $headerRange = 'A1:' . $lastColumn . '1';
 

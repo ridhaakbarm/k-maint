@@ -55,6 +55,12 @@ return [
             'lock_path' => storage_path('framework/cache/data'),
         ],
 
+        'excel' => [
+            'driver' => 'file',
+            'path' => storage_path('framework/cache/laravel-excel-cells'),
+            'lock_path' => storage_path('framework/cache/laravel-excel-cells'),
+        ],
+
         'memcached' => [
             'driver' => 'memcached',
             'persistent_id' => env('MEMCACHED_PERSISTENT_ID'),
