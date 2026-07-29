@@ -10,8 +10,8 @@
             <small class="text-muted">Ringkasan kondisi Preventive Maintenance, progres checklist, dan performa teknisi.</small>
         </div>
         <div class="d-flex gap-2 flex-wrap">
-            <a href="{{ route('export.pm', ['start_date' => $dateFrom, 'end_date' => $dateTo, 'format' => 'csv']) }}" class="btn btn-success">
-                <i class="fas fa-file-csv me-1"></i> Export Detail PM
+            <a href="{{ route('export.pm.xlsx.start', ['start_date' => $dateFrom, 'end_date' => $dateTo]) }}" class="btn btn-success">
+                <i class="fas fa-file-excel me-1"></i> Export Detail PM
             </a>
             <!-- Removed Laporan Efektivitas link since technicianId is removed from filters -->
         </div>

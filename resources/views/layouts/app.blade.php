@@ -648,8 +648,7 @@
 
                         <!-- PM EXPORT TAB -->
                         <div class="tab-pane fade" id="pm-export" role="tabpanel">
-                            <form action="{{ route('export.pm') }}" method="GET" id="exportPmForm">
-                                <input type="hidden" name="format" value="csv">
+                            <form action="{{ route('export.pm.xlsx.start') }}" method="GET" id="exportPmForm">
                                 <div class="row g-3">
                                     <div class="col-md-6">
                                         <label for="pm_start_date" class="form-label fw-bold">
@@ -675,7 +674,7 @@
                                             </h6>
                                             <ul class="mb-0 small">
                                                 <li>Data yang diexport mengikuti rentang tanggal cek atau due date PM.</li>
-                                                <li>Format CSV dibuat 1 baris per item checklist agar detail bisa difilter per kolom di Excel.</li>
+                                                <li>Format XLSX dibuat di background agar tidak terputus oleh timeout Cloudflare.</li>
                                                 <li>Kolom FA-Code tidak disertakan di export PM.</li>
                                                 <li>Status PM yang akan diexport: Semua status (In Progress, Completed, Verified)</li>
                                             </ul>
@@ -685,7 +684,7 @@
 
                                 <div class="modal-footer border-0 px-0 pb-0">
                                     <button type="submit" class="btn btn-success">
-                                        <i class="fas fa-file-csv me-1"></i>Export PM ke CSV
+                                        <i class="fas fa-file-excel me-1"></i>Export PM ke XLSX
                                     </button>
                                 </div>
                             </form>

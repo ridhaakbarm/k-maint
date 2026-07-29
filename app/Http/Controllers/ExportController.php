@@ -10,7 +10,10 @@ use App\Exports\PmExport;
 use App\Exports\ManagerReportExport;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Carbon\Carbon;
+use Throwable;
 
 class ExportController extends Controller
 {
@@ -70,7 +73,7 @@ class ExportController extends Controller
 
     public function exportPm(Request $request)
     {
-        $timeout = (int) config('exports.pm_timeout', 300);
+        $timeout = (int) config('exports.pm_timeout', 1800);
         @set_time_limit($timeout);
         @ini_set('max_execution_time', (string) $timeout);
 
@@ -90,6 +93,111 @@ class ExportController extends Controller
         $filename = 'pm_export_' . $startDate . '_sd_' . $endDate . '_' . date('Y-m-d_H-i-s') . '.xlsx';
 
         return Excel::download(new PmExport($startDate, $endDate), $filename);
+    }
+
+    public function startPmXlsxExport(Request $request)
+    {
+        $validated = $request->validate([
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date',
+        ]);
+
+        $startDate = $validated['start_date'] ?? now()->startOfMonth()->toDateString();
+        $endDate = $validated['end_date'] ?? now()->endOfMonth()->toDateString();
+        $token = (string) Str::uuid();
+        $filename = 'pm_export_' . $startDate . '_sd_' . $endDate . '_' . date('Y-m-d_H-i-s') . '.xlsx';
+        $directory = 'exports/pm/' . $token;
+        $filePath = $directory . '/' . $filename;
+        $statusPath = $directory . '/status.json';
+
+        Storage::makeDirectory($directory);
+        $this->writePmExportStatus($statusPath, [
+            'status' => 'processing',
+            'message' => 'File XLSX sedang dibuat.',
+            'filename' => $filename,
+            'download_url' => null,
+            'created_at' => now()->toDateTimeString(),
+            'finished_at' => null,
+        ]);
+
+        app()->terminating(function () use ($startDate, $endDate, $filePath, $statusPath, $filename, $token) {
+            $timeout = (int) config('exports.pm_timeout', 1800);
+            @set_time_limit($timeout);
+            @ini_set('max_execution_time', (string) $timeout);
+
+            try {
+                Excel::store(new PmExport($startDate, $endDate), $filePath, 'local');
+
+                $this->writePmExportStatus($statusPath, [
+                    'status' => 'done',
+                    'message' => 'File XLSX sudah siap diunduh.',
+                    'filename' => $filename,
+                    'download_url' => route('export.pm.xlsx.download', ['token' => $token]),
+                    'finished_at' => now()->toDateTimeString(),
+                ]);
+            } catch (Throwable $exception) {
+                $this->writePmExportStatus($statusPath, [
+                    'status' => 'failed',
+                    'message' => config('app.debug')
+                        ? $exception->getMessage()
+                        : 'Export gagal diproses. Silakan coba periode yang lebih pendek atau hubungi admin.',
+                    'filename' => $filename,
+                    'download_url' => null,
+                    'finished_at' => now()->toDateTimeString(),
+                ]);
+            }
+        });
+
+        return view('exports.pm_xlsx_status', [
+            'statusUrl' => route('export.pm.xlsx.status', ['token' => $token]),
+            'startDate' => $startDate,
+            'endDate' => $endDate,
+            'filename' => $filename,
+        ]);
+    }
+
+    public function pmXlsxExportStatus(string $token)
+    {
+        abort_unless(Str::isUuid($token), 404);
+
+        $statusPath = 'exports/pm/' . $token . '/status.json';
+        abort_unless(Storage::exists($statusPath), 404);
+
+        return response()->json($this->readPmExportStatus($statusPath));
+    }
+
+    public function downloadPmXlsxExport(string $token)
+    {
+        abort_unless(Str::isUuid($token), 404);
+
+        $directory = 'exports/pm/' . $token;
+        $statusPath = $directory . '/status.json';
+        abort_unless(Storage::exists($statusPath), 404);
+
+        $status = $this->readPmExportStatus($statusPath);
+        abort_unless(($status['status'] ?? null) === 'done', 404);
+
+        $filePath = $directory . '/' . ($status['filename'] ?? '');
+        abort_unless(Storage::exists($filePath), 404);
+
+        return response()->download(storage_path('app/' . $filePath), $status['filename']);
+    }
+
+    protected function writePmExportStatus(string $path, array $status): void
+    {
+        $current = Storage::exists($path) ? $this->readPmExportStatus($path) : [];
+
+        Storage::put($path, json_encode(array_merge($current, $status), JSON_PRETTY_PRINT));
+    }
+
+    protected function readPmExportStatus(string $path): array
+    {
+        $status = json_decode(Storage::get($path), true);
+
+        return is_array($status) ? $status : [
+            'status' => 'failed',
+            'message' => 'Status export tidak bisa dibaca.',
+        ];
     }
 
     protected function exportPmCsv(string $startDate, string $endDate)

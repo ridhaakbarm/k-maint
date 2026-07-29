@@ -126,6 +126,9 @@ Route::prefix('pm-checks')->group(function () {
     // Export & Reporting
     Route::get('/export/excel', [ExportController::class, 'exportExcel'])->name('export.excel');
         Route::get('/export/technician-pm-items', [ExportController::class, 'exportTechnicianPmItems'])->name('export.technician-pm-items');
+    Route::get('/export/pm-xlsx/start', [ExportController::class, 'startPmXlsxExport'])->name('export.pm.xlsx.start');
+    Route::get('/export/pm-xlsx/status/{token}', [ExportController::class, 'pmXlsxExportStatus'])->name('export.pm.xlsx.status');
+    Route::get('/export/pm-xlsx/download/{token}', [ExportController::class, 'downloadPmXlsxExport'])->name('export.pm.xlsx.download');
     Route::get('/export/pm', [ExportController::class, 'exportPm'])->name('export.pm');
     Route::get('/export/manager-report', [ExportController::class, 'exportManagerReport'])->name('export.manager-report');
     Route::prefix('reports')->name('reports.')->group(function () {

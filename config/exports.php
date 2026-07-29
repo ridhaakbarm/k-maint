@@ -1,5 +1,5 @@
 <?php
 
 return [
-    'pm_timeout' => env('EXPORT_PM_TIMEOUT', 300),
+    'pm_timeout' => env('EXPORT_PM_TIMEOUT', 1800),
 ];
