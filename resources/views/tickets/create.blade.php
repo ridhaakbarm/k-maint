@@ -103,6 +103,7 @@
                         <label for="attachment" class="form-label fw-bold">Attachment (Gambar)</label>
                         <input type="file" class="form-control @error('attachment') is-invalid @enderror"
                             id="attachment" name="attachment" accept="image/*" {{ !$canCreateTicket ? 'disabled' : '' }}>
+                        @error('attachment') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         <div class="form-text text-muted">Format: JPG, PNG, GIF (Maksimal 10MB)</div>
                     </div>
 

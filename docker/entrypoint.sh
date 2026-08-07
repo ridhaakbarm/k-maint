@@ -4,6 +4,7 @@ set -e
 cd /var/www/html
 
 mkdir -p \
+    public/attachments \
     storage/app/public \
     storage/framework/cache/data \
     storage/framework/sessions \
@@ -12,8 +13,8 @@ mkdir -p \
     storage/logs \
     bootstrap/cache
 
-chown -R www-data:www-data storage bootstrap/cache
-chmod -R ug+rw storage bootstrap/cache
+chown -R www-data:www-data public/attachments storage bootstrap/cache
+chmod -R ug+rw public/attachments storage bootstrap/cache
 
 if [ ! -L public/storage ]; then
     php artisan storage:link --force || true

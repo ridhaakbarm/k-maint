@@ -60,6 +60,7 @@ COPY --from=vendor /var/www/html /var/www/html
 COPY docker/nginx.conf /etc/nginx/nginx.conf
 COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY docker/entrypoint.sh /usr/local/bin/docker-entrypoint
+COPY docker/php.ini /usr/local/etc/php/conf.d/custom.ini
 
 RUN chmod +x /usr/local/bin/docker-entrypoint \
     && mkdir -p /run/nginx /var/log/supervisor \
