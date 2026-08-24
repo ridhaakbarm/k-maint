@@ -711,7 +711,7 @@
                                         <td class="text-center">
                                             {{-- View Photo Button --}}
                                             @if($item->photo_before)
-                                                <a href="{{ Storage::url($item->photo_before) }}" 
+                                                <a href="{{ Storage::disk('s3')->url($item->photo_before) }}" 
                                                    target="_blank" 
                                                    class="btn-view-photo">
                                                     <i class="fas fa-eye me-1"></i>LIHAT FOTO
