@@ -95,10 +95,10 @@
                             <tr>
                                 <th class="bg-light">Foto Sebelum Perbaikan</th>
                                 <td>
-                                    <img src="{{ asset('/' . $ticket->attachment) }}" alt="Before Photo"
+                                    <img src="{{ Storage::disk('s3')->url($ticket->attachment) }}" alt="Before Photo"
                                         class="img-thumbnail" style="max-height: 250px;">
                                     <div class="mt-2">
-                                        <a href="{{ asset('/' . $ticket->attachment) }}" target="_blank"
+                                        <a href="{{ Storage::disk('s3')->url($ticket->attachment) }}" target="_blank"
                                             class="btn btn-sm btn-outline-primary">
                                             <i class="fas fa-external-link-alt"></i> Lihat Full Size
                                         </a>
@@ -111,9 +111,9 @@
                             <tr>
                                 <th class="bg-light">Foto Sesudah Perbaikan</th>
                                 <td>
-                                    <img src="{{ asset($ticket->after_photo) }}" alt="After Photo" class="img-thumbnail" style="max-height: 250px;">
+                                    <img src="{{ Storage::disk('s3')->url($ticket->after_photo) }}" alt="After Photo" class="img-thumbnail" style="max-height: 250px;">
                                     <div class="mt-2">
-                                        <a href="{{ asset('attachments/' . $ticket->after_photo) }}" target="_blank"
+                                        <a href="{{ Storage::disk('s3')->url($ticket->after_photo) }}" target="_blank"
                                             class="btn btn-sm btn-outline-primary">
                                             <i class="fas fa-external-link-alt"></i> Lihat Full Size
                                         </a>

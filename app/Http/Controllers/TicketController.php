@@ -135,7 +135,7 @@ class TicketController extends Controller
         if ($request->hasFile('attachment')) {
             $file = $request->file('attachment');
             $fileName = time() . '_' . $file->getClientOriginalName();
-            $file->move(public_path('attachments'), $fileName);
+            $file->storeAs('attachments', $fileName, 's3');
             $attachmentPath = 'attachments/' . $fileName;
         }
 
@@ -255,7 +255,7 @@ class TicketController extends Controller
             }
 
             if ($request->hasFile('after_photo')) {
-                $updateData['after_photo'] = $request->file('after_photo')->store('after_photos', 'public');
+                $updateData['after_photo'] = $request->file('after_photo')->store('after_photos', 's3');
             }
 
             $ticket->update($updateData);
@@ -328,7 +328,7 @@ class TicketController extends Controller
         if ($request->hasFile('after_photo')) {
             $file = $request->file('after_photo');
             $filename = time() . '_' . $file->getClientOriginalName();
-            $file->move(public_path('attachments'), $filename);
+            $file->storeAs('attachments', $filename, 's3');
             $ticket->after_photo = 'attachments/' . $filename;
             $ticket->save();
         }
@@ -439,7 +439,7 @@ public function markAsFinished(Request $request, Ticket $ticket)
     if ($request->hasFile('after_photo')) {
         $file = $request->file('after_photo');
         $fileName = time() . '_' . $file->getClientOriginalName();
-        $file->move(public_path('attachments'), $fileName);
+        $file->storeAs('attachments', $fileName, 's3');
         $ticket->after_photo = 'attachments/' . $fileName;
     }
 

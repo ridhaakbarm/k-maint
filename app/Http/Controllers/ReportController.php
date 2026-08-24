@@ -43,9 +43,9 @@ class ReportController extends Controller
 
         if ($request->hasFile('photo_after')) {
             if ($item->photo_after) {
-                Storage::disk('public')->delete($item->photo_after);
+                Storage::disk('s3')->delete($item->photo_after);
             }
-            $item->photo_after = $request->file('photo_after')->store('pm-photos/after', 'public');
+            $item->photo_after = $request->file('photo_after')->store('pm-photos/after', 's3');
         }
 
         $item->save();

@@ -71,7 +71,7 @@ class InternalTicketController extends Controller
         if ($request->hasFile('attachment')) {
             $file = $request->file('attachment');
             $fileName = time() . '_' . $file->getClientOriginalName();
-            $file->move(public_path('attachments/internal_tickets'), $fileName);
+            $file->storeAs('attachments/internal_tickets', $fileName, 's3');
             $attachmentPath = 'attachments/internal_tickets/' . $fileName;
         }
 
@@ -210,7 +210,7 @@ class InternalTicketController extends Controller
         if ($request->hasFile('after_photo')) {
             $file = $request->file('after_photo');
             $fileName = time() . '_' . $file->getClientOriginalName();
-            $file->move(public_path('attachments/internal_tickets'), $fileName);
+            $file->storeAs('attachments/internal_tickets', $fileName, 's3');
             $afterPhotoPath = 'attachments/internal_tickets/' . $fileName;
         }
 

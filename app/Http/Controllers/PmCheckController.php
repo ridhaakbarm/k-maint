@@ -363,7 +363,7 @@ public function batchUpdateItems(Request $request, $checkId)
                 if (isset($itemData['next_action'])) $updates['next_action'] = $itemData['next_action'];
 
                 if ($request->hasFile("items.$itemId.photo_before")) {
-                    $updates['photo_before'] = $request->file("items.$itemId.photo_before")->store('pm-photos/before', 'public');
+                    $updates['photo_before'] = $request->file("items.$itemId.photo_before")->store('pm-photos/before', 's3');
                 }
             }
 

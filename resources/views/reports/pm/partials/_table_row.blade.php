@@ -31,7 +31,7 @@
     
     <td id="photo-cell-{{ $item->id }}" class="text-center">
         @if($item->photo_after)
-            <a href="{{ asset('storage/' . $item->photo_after) }}" target="_blank" class="btn btn-sm btn-info text-white"><i class="fas fa-image"></i></a>
+            <a href="{{ Storage::disk('s3')->url($item->photo_after) }}" target="_blank" class="btn btn-sm btn-info text-white"><i class="fas fa-image"></i></a>
         @else - @endif
     </td>
     <td>

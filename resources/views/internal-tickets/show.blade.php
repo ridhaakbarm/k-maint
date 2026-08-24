@@ -115,8 +115,8 @@
                     <tr>
                         <th class="bg-light">Foto Temuan</th>
                         <td>
-                            <img src="{{ asset($ticket->attachment) }}" alt="Foto Temuan" class="img-thumbnail" style="max-height: 250px;">
-                            <div class="mt-2"><a href="{{ asset($ticket->attachment) }}" target="_blank" class="btn btn-sm btn-outline-primary">Lihat Full Size</a></div>
+                            <img src="{{ Storage::disk('s3')->url($ticket->attachment) }}" alt="Foto Temuan" class="img-thumbnail" style="max-height: 250px;">
+                            <div class="mt-2"><a href="{{ Storage::disk('s3')->url($ticket->attachment) }}" target="_blank" class="btn btn-sm btn-outline-primary">Lihat Full Size</a></div>
                         </td>
                     </tr>
                     @endif
@@ -124,8 +124,8 @@
                     <tr>
                         <th class="bg-light">Foto Selesai</th>
                         <td>
-                            <img src="{{ asset($ticket->after_photo) }}" alt="Foto Selesai" class="img-thumbnail" style="max-height: 250px;">
-                            <div class="mt-2"><a href="{{ asset($ticket->after_photo) }}" target="_blank" class="btn btn-sm btn-outline-primary">Lihat Full Size</a></div>
+                            <img src="{{ Storage::disk('s3')->url($ticket->after_photo) }}" alt="Foto Selesai" class="img-thumbnail" style="max-height: 250px;">
+                            <div class="mt-2"><a href="{{ Storage::disk('s3')->url($ticket->after_photo) }}" target="_blank" class="btn btn-sm btn-outline-primary">Lihat Full Size</a></div>
                         </td>
                     </tr>
                     @endif
