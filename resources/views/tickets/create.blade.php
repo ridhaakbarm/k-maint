@@ -158,6 +158,10 @@
                                             <label class="form-check-label" for="sub_vibra">Vibra</label>
                                         </div>
                                         <div class="form-check mb-2">
+                                            <input class="form-check-input extruder-check" type="radio" name="subject_extruder" id="sub_seal" value="Ganti Seal">
+                                            <label class="form-check-label" for="sub_seal">Ganti Seal</label>
+                                        </div>
+                                        <div class="form-check mb-2">
                                             <input class="form-check-input extruder-check" type="radio" name="subject_extruder" id="sub_other" value="Other">
                                             <label class="form-check-label" for="sub_other">Other</label>
                                         </div>
