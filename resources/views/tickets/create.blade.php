@@ -87,8 +87,91 @@
 
                     <div class="mb-3">
                         <label for="subject" class="form-label fw-bold">Subject *</label>
-                        <input type="text" class="form-control @error('subject') is-invalid @enderror" id="subject"
-                            name="subject" value="{{ old('subject') }}" placeholder="Masukkan subject ticket..." required {{ !$canCreateTicket ? 'disabled' : '' }}>
+                        <input type="hidden" id="subject" name="subject" value="{{ old('subject') }}">
+
+                        {{-- Input manual untuk non-EXTRUDER --}}
+                        <input type="text" class="form-control @error('subject') is-invalid @enderror" id="subject_manual"
+                            placeholder="Masukkan subject ticket..." {{ !$canCreateTicket ? 'disabled' : '' }}
+                            style="display: none;">
+
+                        {{-- Checkbox group untuk EXTRUDER --}}
+                        <div id="extruder_subject_group" style="display: none;">
+                            <div class="border rounded p-3 bg-light">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input extruder-check" type="radio" name="subject_extruder" id="sub_heater" value="Heater">
+                                            <label class="form-check-label" for="sub_heater">Heater</label>
+                                        </div>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input extruder-check" type="radio" name="subject_extruder" id="sub_cutter" value="Cutter">
+                                            <label class="form-check-label" for="sub_cutter">Cutter</label>
+                                        </div>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input extruder-check" type="radio" name="subject_extruder" id="sub_screw" value="Screw Extruder">
+                                            <label class="form-check-label" for="sub_screw">Screw Extruder</label>
+                                        </div>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input extruder-check" type="radio" name="subject_extruder" id="sub_gearbox" value="Gearbox Mesin Utama">
+                                            <label class="form-check-label" for="sub_gearbox">Gearbox Mesin Utama</label>
+                                        </div>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input extruder-check" type="radio" name="subject_extruder" id="sub_panel" value="Panel Extruder">
+                                            <label class="form-check-label" for="sub_panel">Panel Extruder</label>
+                                        </div>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input extruder-check" type="radio" name="subject_extruder" id="sub_airknife" value="Air Knife">
+                                            <label class="form-check-label" for="sub_airknife">Air Knife</label>
+                                        </div>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input extruder-check" type="radio" name="subject_extruder" id="sub_feeder" value="Feeder">
+                                            <label class="form-check-label" for="sub_feeder">Feeder</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input extruder-check" type="radio" name="subject_extruder" id="sub_heatexchanger" value="Heat Exchanger & Cooling System">
+                                            <label class="form-check-label" for="sub_heatexchanger">Heat Exchanger & Cooling System</label>
+                                        </div>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input extruder-check" type="radio" name="subject_extruder" id="sub_waterbatch" value="Waterbatch">
+                                            <label class="form-check-label" for="sub_waterbatch">Waterbatch</label>
+                                        </div>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input extruder-check" type="radio" name="subject_extruder" id="sub_motor" value="Motor Utama">
+                                            <label class="form-check-label" for="sub_motor">Motor Utama</label>
+                                        </div>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input extruder-check" type="radio" name="subject_extruder" id="sub_conveyor" value="Conveyor">
+                                            <label class="form-check-label" for="sub_conveyor">Conveyor</label>
+                                        </div>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input extruder-check" type="radio" name="subject_extruder" id="sub_vacuum" value="Vaccum">
+                                            <label class="form-check-label" for="sub_vacuum">Vaccum</label>
+                                        </div>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input extruder-check" type="radio" name="subject_extruder" id="sub_screenchanger" value="Screen Changer">
+                                            <label class="form-check-label" for="sub_screenchanger">Screen Changer</label>
+                                        </div>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input extruder-check" type="radio" name="subject_extruder" id="sub_vibra" value="Vibra">
+                                            <label class="form-check-label" for="sub_vibra">Vibra</label>
+                                        </div>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input extruder-check" type="radio" name="subject_extruder" id="sub_other" value="Other">
+                                            <label class="form-check-label" for="sub_other">Other</label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="other_subject_input" class="mt-2" style="display: none;">
+                                    <input type="text" class="form-control" id="subject_other" placeholder="Masukkan subject lainnya..." {{ !$canCreateTicket ? 'disabled' : '' }}>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="subject_error" class="text-danger small mt-1" style="display: none;">
+                            Subject wajib dipilih.
+                        </div>
                         @error('subject') <div class="invalid-feedback">{{ $message }}</div> @enderror
                     </div>
 
@@ -172,11 +255,92 @@ $(document).ready(function() {
     const canCreateTicket = {{ $canCreateTicket ? 'true' : 'false' }};
     
     if (canCreateTicket) {
-        // Inisialisasi Select2
         $('#asset_id').select2({
             placeholder: '-- Pilih Mesin --',
             allowClear: true
         });
+
+        const $subjectInput = $('#subject');
+        const $subjectManual = $('#subject_manual');
+        const $extruderGroup = $('#extruder_subject_group');
+        const $otherInput = $('#other_subject_input');
+        const $subjectOther = $('#subject_other');
+        const $subjectError = $('#subject_error');
+
+        function syncSubject() {
+            const selectedAsset = $('#asset_id option:selected').text().trim().toUpperCase();
+            const isExtruder = selectedAsset.includes('EXTRUDER');
+
+            if (isExtruder) {
+                $subjectManual.hide().removeAttr('required');
+                $extruderGroup.show();
+                const checkedVal = $('input[name="subject_extruder"]:checked').val();
+                if (checkedVal === 'Other') {
+                    $subjectInput.val($subjectOther.val());
+                } else {
+                    $subjectInput.val(checkedVal || '');
+                }
+            } else {
+                $subjectManual.show().attr('required', 'required');
+                $extruderGroup.hide();
+                $otherInput.hide();
+                $('input[name="subject_extruder"]').prop('checked', false);
+                $subjectInput.val($subjectManual.val());
+            }
+            $subjectError.hide();
+        }
+
+        $('#asset_id').on('change', syncSubject);
+
+        $('input[name="subject_extruder"]').on('change', function() {
+            const val = $(this).val();
+            if (val === 'Other') {
+                $otherInput.show();
+                $subjectOther.focus();
+                $subjectInput.val($subjectOther.val());
+            } else {
+                $otherInput.hide();
+                $subjectInput.val(val);
+            }
+            $subjectError.hide();
+        });
+
+        $subjectOther.on('input', function() {
+            $subjectInput.val($(this).val());
+        });
+
+        $subjectManual.on('input', function() {
+            $subjectInput.val($(this).val());
+        });
+
+        $('form').on('submit', function(e) {
+            const selectedAsset = $('#asset_id option:selected').text().trim().toUpperCase();
+            const isExtruder = selectedAsset.includes('EXTRUDER');
+
+            if (isExtruder) {
+                const checkedVal = $('input[name="subject_extruder"]:checked').val();
+                if (!checkedVal) {
+                    e.preventDefault();
+                    $subjectError.show();
+                    return false;
+                }
+                if (checkedVal === 'Other' && !$subjectOther.val().trim()) {
+                    e.preventDefault();
+                    $subjectError.text('Subject lainnya wajib diisi.').show();
+                    return false;
+                }
+                $subjectInput.val(checkedVal === 'Other' ? $subjectOther.val() : checkedVal);
+            } else {
+                if (!$subjectManual.val().trim()) {
+                    e.preventDefault();
+                    $subjectError.text('Subject wajib diisi.').show();
+                    return false;
+                }
+                $subjectInput.val($subjectManual.val());
+            }
+        });
+
+        syncSubject();
     }
 });
 </script>
