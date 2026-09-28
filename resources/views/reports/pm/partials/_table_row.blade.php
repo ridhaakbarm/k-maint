@@ -19,8 +19,15 @@
     </td>
     <td>{{ $item->pmCheck->check_date->format('d/m/Y') }}</td>
     <td><strong>{{ $item->pmCheck->pmSchedule->asset->name ?? '-' }}</strong></td>
-    <td>{{ $item->checklistTemplate->item_name }}</td>
-    <td>{{ $item->checklistTemplate->standard_action ?? '-' }}</td>
+    <td>
+        <div class="fw-bold text-primary">{{ optional($item->checklistTemplate)->item_name ?? '-' }}</div>
+        @if(!empty(optional($item->checklistTemplate)->checked_part))
+            <div class="text-muted" style="font-size: 0.78rem;">
+                <i class="fas fa-puzzle-piece me-1"></i>{{ $item->checklistTemplate->checked_part }}
+            </div>
+        @endif
+    </td>
+    <td>{{ $item->action_taken ?? '-' }}</td>
     <td><mark class="bg-warning-light text-danger fw-bold">{{ $item->next_action }}</mark></td>
     
     <td>{{ $item->follow_up_note ?? '-' }}</td>
