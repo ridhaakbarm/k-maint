@@ -12,7 +12,7 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        $schedule->command('tickets:auto-close-requested')->dailyAt('00:10');
+        //
     }
 
     /**
