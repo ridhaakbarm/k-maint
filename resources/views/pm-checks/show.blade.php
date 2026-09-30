@@ -623,27 +623,25 @@
                                         {{-- Condition Result --}}
                                         <td class="pm-result-cell">
                                             @if($pmCheck->status == 'in_progress' && (Auth::user()->isMTC() || Auth::user()->isAdmin() || Auth::user()->isGA()))
-                                                <select name="items[{{ $item->id }}][condition]" 
-                                                        class="form-select condition-select select2-searchable" 
-                                                        id="condition-{{ $item->id }}">
+                                                @php
+                                                    $predefinedConditions = ['Berfungsi','Normal','Bersih','Tekanan OK','Aus','Bergetar','Bocor','Kendor','Kering','Kotor','Rantas','Rompal','Rusak','Suara Kasar','Tindakan Tidak OK','Sedang dalam perbaikan'];
+                                                    $isOtherSelected = !empty($item->condition) && !in_array($item->condition, $predefinedConditions);
+                                                    $otherValues = $isOtherSelected ? array_map('trim', explode(',', $item->condition)) : [''];
+                                                    $otherValues = array_filter($otherValues, fn($v) => $v !== '');
+                                                    if (empty($otherValues)) $otherValues = [''];
+                                                    $otherValues = array_values($otherValues);
+                                                @endphp
+                                                <select name="items[{{ $item->id }}][condition]"
+                                                        class="form-select condition-select select2-searchable"
+                                                        id="condition-{{ $item->id }}"
+                                                        data-item-id="{{ $item->id }}">
                                                     <option value="" {{ empty($item->condition) ? 'selected' : '' }}>-- Pilih Hasil --</option>
-                                                    
+
                                                     <optgroup label="Kondisi Normal">
                                                         <option value="Berfungsi" {{ $item->condition == 'Berfungsi' ? 'selected' : '' }}>Berfungsi</option>
                                                         <option value="Normal" {{ $item->condition == 'Normal' ? 'selected' : '' }}>Normal</option>
                                                         <option value="Bersih" {{ $item->condition == 'Bersih' ? 'selected' : '' }}>Bersih</option>
                                                         <option value="Tekanan OK" {{ $item->condition == 'Tekanan OK' ? 'selected' : '' }}>Tekanan OK</option>
-                                                    </optgroup>
-
-                                                    <optgroup label="Parameter Teknis">
-                                                        <option value="< 15 mm" {{ $item->condition == '< 15 mm' ? 'selected' : '' }}>< 15 mm</option>
-                                                        <option value="< 3 Bar" {{ $item->condition == '< 3 Bar' ? 'selected' : '' }}>< 3 Bar</option>
-                                                        <option value="> 2 Ohm" {{ $item->condition == '> 2 Ohm' ? 'selected' : '' }}>> 2 Ohm</option>
-                                                        <option value="> 1,1 Kpa" {{ $item->condition == '> 1,1 Kpa' ? 'selected' : '' }}>> 1,1 Kpa</option>
-                                                        <option value="Temp > 40°C" {{ $item->condition == 'Temp > 40°C' ? 'selected' : '' }}>Temp > 40°C</option>
-                                                        <option value="Temp > 85°C" {{ $item->condition == 'Temp > 85°C' ? 'selected' : '' }}>Temp > 85°C</option>
-                                                        <option value="Temp > 100°C" {{ $item->condition == 'Temp > 100°C' ? 'selected' : '' }}>Temp > 100°C</option>
-                                                        <option value="Tidak diantara 1,5 - 2,5 Bar" {{ $item->condition == 'Tidak diantara 1,5 - 2,5 Bar' ? 'selected' : '' }}>Tidak diantara 1,5 - 2,5 Bar</option>
                                                     </optgroup>
 
                                                     <optgroup label="Temuan Masalah">
@@ -661,8 +659,32 @@
                                                         <option value="Sedang dalam perbaikan" {{ $item->condition == 'Sedang dalam perbaikan' ? 'selected' : '' }}>Sedang dalam perbaikan</option>
                                                     </optgroup>
 
-                                                    <option value="Tulis Kondisinya" {{ $item->condition == 'Tulis Kondisinya' ? 'selected' : '' }}>Tulis Kondisinya...</option>
+                                                    <option value="Other" {{ $isOtherSelected || $item->condition == 'Other' ? 'selected' : '' }}>Other (Lainnya)...</option>
                                                 </select>
+
+                                                {{-- Input manual dinamis untuk pilihan Other --}}
+                                                <div class="other-input-wrapper mt-2 p-2 border rounded bg-light" id="other-wrapper-{{ $item->id }}" style="{{ $isOtherSelected ? '' : 'display:none;' }}">
+                                                    <label class="form-label fw-bold small mb-1">
+                                                        <i class="fas fa-pen me-1"></i>Tulis Hasil Manual:
+                                                    </label>
+                                                    <div class="other-inputs-list" id="other-list-{{ $item->id }}">
+                                                        @foreach($otherValues as $otherVal)
+                                                        <div class="input-group input-group-sm mb-1 other-input-row">
+                                                            <input type="text"
+                                                                   name="items[{{ $item->id }}][condition_others][]"
+                                                                   class="form-control other-manual-input"
+                                                                   placeholder="Ketik hasil manual..."
+                                                                   value="{{ $otherVal }}">
+                                                            <button type="button" class="btn btn-outline-danger btn-remove-other" title="Hapus input ini">
+                                                                <i class="fas fa-minus"></i>
+                                                            </button>
+                                                        </div>
+                                                        @endforeach
+                                                    </div>
+                                                    <button type="button" class="btn btn-sm btn-outline-primary w-100 mt-1 btn-add-other" data-item="{{ $item->id }}">
+                                                        <i class="fas fa-plus me-1"></i>Tambah Input
+                                                    </button>
+                                                </div>
                                             @else
                                                 <span class="badge {{ in_array($item->condition, ['Normal', 'Berfungsi', 'Bersih', 'Tekanan OK']) ? 'bg-success' : 'bg-secondary' }} text-white">
                                                     {{ $item->condition ?? 'Belum Dicek' }}
@@ -844,6 +866,59 @@ $(document).ready(function() {
         }
     });
 
+    // ========== 1b. Other (manual input dinamis) ==========
+    function toggleOtherWrapper(itemId) {
+        const val = $('#condition-' + itemId).val();
+        const wrapper = $('#other-wrapper-' + itemId);
+        if (val === 'Other') {
+            wrapper.slideDown(150);
+        } else {
+            wrapper.slideUp(150);
+        }
+    }
+
+    // Init saat load (untuk data custom lama)
+    $('.condition-select').each(function() {
+        const itemId = $(this).data('item-id') || $(this).attr('id').split('-')[1];
+        toggleOtherWrapper(itemId);
+    });
+
+    // Saat dropdown berubah
+    $(document).on('change', '.condition-select', function() {
+        const itemId = $(this).data('item-id') || $(this).attr('id').split('-')[1];
+        toggleOtherWrapper(itemId);
+    });
+
+    // Tambah input manual baru
+    $(document).on('click', '.btn-add-other', function() {
+        const itemId = $(this).data('item');
+        const list = $('#other-list-' + itemId);
+        const row = `
+            <div class="input-group input-group-sm mb-1 other-input-row">
+                <input type="text"
+                       name="items[${itemId}][condition_others][]"
+                       class="form-control other-manual-input"
+                       placeholder="Ketik hasil manual...">
+                <button type="button" class="btn btn-outline-danger btn-remove-other" title="Hapus input ini">
+                    <i class="fas fa-minus"></i>
+                </button>
+            </div>`;
+        list.append(row);
+        list.find('input:last').focus();
+        formChanged = true;
+    });
+
+    // Hapus satu baris input manual (sisakan minimal 1)
+    $(document).on('click', '.btn-remove-other', function() {
+        const list = $(this).closest('.other-inputs-list');
+        if (list.find('.other-input-row').length > 1) {
+            $(this).closest('.other-input-row').remove();
+        } else {
+            list.find('input').val('').focus();
+        }
+        formChanged = true;
+    });
+
     // ========== 2. Master Switch Verifikasi ==========
     $('#checkAllVerif').on('change', function() {
         $('.verif-checkbox').prop('checked', this.checked).trigger('change');
@@ -892,9 +967,10 @@ $(document).ready(function() {
 
     // ========== 5. Auto-save Notification ==========
     let saveTimeout;
-    $('textarea, .condition-select, .verif-checkbox').on('change', function() {
+    $(document).on('change', 'textarea, .condition-select, .verif-checkbox, .other-manual-input', function() {
         clearTimeout(saveTimeout);
         const saveBtn = $('#saveButton');
+        if (!saveBtn.length) return;
         
         // Show unsaved changes indicator
         if (!saveBtn.hasClass('btn-warning')) {
@@ -955,30 +1031,44 @@ function validateBeforeComplete() {
     const conditions = document.querySelectorAll('.condition-select');
     let allFilled = true;
     let emptyItems = [];
-    
-    conditions.forEach((select, index) => { 
+    let otherEmptyItems = [];
+
+    conditions.forEach((select, index) => {
         const value = $(select).val();
         if (value === "" || value === null) {
             allFilled = false;
             emptyItems.push(index + 1);
+        } else if (value === 'Other') {
+            const itemId = $(select).data('item-id') || $(select).attr('id').split('-')[1];
+            const filled = $('#other-list-' + itemId + ' .other-manual-input')
+                .map(function() { return $(this).val().trim(); }).get()
+                .filter(v => v !== '');
+            if (filled.length === 0) {
+                allFilled = false;
+                otherEmptyItems.push(index + 1);
+            }
         }
     });
-    
-    if (!allFilled) { 
+
+    if (!allFilled) {
+        if (otherEmptyItems.length > 0) {
+            alert(`⚠️ PERHATIAN!\n\nPilihan "Other" butuh input manual.\n\nItem ke #${otherEmptyItems.join(', ')} belum ada teks manualnya. Harap ketik minimal 1 hasil manual.`);
+            return false;
+        }
         const itemList = emptyItems.slice(0, 5).join(', ');
         const moreItems = emptyItems.length > 5 ? ` dan ${emptyItems.length - 5} item lainnya` : '';
-        
-        alert(`⚠️ PERHATIAN!\n\nHarap isi HASIL PENGECEKAN untuk semua item sebelum menyelesaikan.\n\nItem yang belum diisi: #${itemList}${moreItems}`); 
-        return false; 
+
+        alert(`⚠️ PERHATIAN!\n\nHarap isi HASIL PENGECEKAN untuk semua item sebelum menyelesaikan.\n\nItem yang belum diisi: #${itemList}${moreItems}`);
+        return false;
     }
-    
+
     return confirm('✅ Kirim checklist ini ke Admin untuk diverifikasi?\n\nPastikan semua data sudah benar.');
 }
 
 // ========== 11. Prevent Accidental Page Leave ==========
 let formChanged = false;
 
-$('textarea, .condition-select, .verif-checkbox, input[type="file"]').on('change', function() {
+$(document).on('change input', 'textarea, .condition-select, .verif-checkbox, input[type="file"], .other-manual-input', function() {
     formChanged = true;
 });
 

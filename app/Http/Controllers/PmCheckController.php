@@ -349,8 +349,16 @@ public function batchUpdateItems(Request $request, $checkId)
 
             if ($pmCheck->status == 'in_progress' || $user->isAdmin()) {
                 // LOGIKA BARU: Jika hasil (condition) diisi, catat waktu dan usernya
-                if (isset($itemData['condition']) && !empty($itemData['condition'])) {
-                    $updates['condition'] = $itemData['condition'];
+                // Support pilihan "Other" -> gabungkan input manual condition_others[]
+                $rawCondition = $itemData['condition'] ?? null;
+                if (in_array($rawCondition, ['Other', 'Tulis Kondisinya'])) {
+                    $others = $itemData['condition_others'] ?? [];
+                    if (!is_array($others)) $others = [$others];
+                    $others = array_values(array_filter(array_map('trim', $others), fn($v) => $v !== ''));
+                    $rawCondition = implode(', ', $others);
+                }
+                if (!empty($rawCondition)) {
+                    $updates['condition'] = $rawCondition;
                     
                     // Catat hanya jika checked_at masih kosong (supaya waktu pertama kali tidak berubah)
                     if (empty($item->checked_at)) {
