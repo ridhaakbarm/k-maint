@@ -348,15 +348,33 @@ public function batchUpdateItems(Request $request, $checkId)
             $updates = [];
 
             if ($pmCheck->status == 'in_progress' || $user->isAdmin()) {
-                // LOGIKA BARU: Jika hasil (condition) diisi, catat waktu dan usernya
-                // Support pilihan "Other" -> gabungkan input manual condition_others[]
-                $rawCondition = $itemData['condition'] ?? null;
-                if (in_array($rawCondition, ['Other', 'Tulis Kondisinya'])) {
-                    $others = $itemData['condition_others'] ?? [];
-                    if (!is_array($others)) $others = [$others];
-                    $others = array_values(array_filter(array_map('trim', $others), fn($v) => $v !== ''));
-                    $rawCondition = implode(', ', $others);
+                // LOGIKA BARU (multi-pilih): gabungkan pilihan dropdown + input manual Other
+                // Support: condition bisa array (multi-select) atau string (legacy single),
+                // dan condition_others[] selalu digabung jika ada isinya.
+                $rawConditions = $itemData['condition'] ?? [];
+                if (!is_array($rawConditions)) $rawConditions = [$rawConditions];
+                $rawConditions = array_values(array_filter(array_map('trim', array_map('strval', $rawConditions)), fn($v) => $v !== '' && $v !== 'Tulis Kondisinya'));
+
+                $hasOtherFlag = in_array('Other', $rawConditions, true);
+                // Buang flag 'Other' dari hasil akhir, sisakan pilihan asli
+                $selectedConditions = array_values(array_filter($rawConditions, fn($v) => $v !== 'Other'));
+
+                $others = $itemData['condition_others'] ?? [];
+                if (!is_array($others)) $others = [$others];
+                $others = array_values(array_filter(array_map('trim', array_map('strval', $others)), fn($v) => $v !== ''));
+
+                // Gabung pilihan + manual, hilangkan duplikat (case-insensitive untuk pilihan baku)
+                $merged = array_merge($selectedConditions, $others);
+                $seen = [];
+                $final = [];
+                foreach ($merged as $val) {
+                    $key = mb_strtolower(trim($val));
+                    if ($key === '' || isset($seen[$key])) continue;
+                    $seen[$key] = true;
+                    $final[] = trim($val);
                 }
+                // Jika user hanya pilih 'Other' tanpa isi manual -> anggap kosong (biar validasi FE/BE menangkap)
+                $rawCondition = implode(', ', $final);
                 if (!empty($rawCondition)) {
                     $updates['condition'] = $rawCondition;
                     

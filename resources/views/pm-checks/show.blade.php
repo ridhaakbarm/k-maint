@@ -120,6 +120,24 @@
         margin-right: 18px !important;
     }
 
+    .pm-result-cell .select2-container--bootstrap-5 .select2-selection--multiple {
+        min-height: 42px !important;
+        padding: 4px 8px !important;
+    }
+
+    .pm-result-cell .select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__rendered {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 3px !important;
+    }
+
+    .pm-result-cell .select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__choice {
+        font-size: 0.75rem !important;
+        max-width: 100% !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
     .column-note {
         display: block;
         margin-top: 3px;
@@ -625,48 +643,50 @@
                                             @if($pmCheck->status == 'in_progress' && (Auth::user()->isMTC() || Auth::user()->isAdmin() || Auth::user()->isGA()))
                                                 @php
                                                     $predefinedConditions = ['Berfungsi','Normal','Bersih','Tekanan OK','Aus','Bergetar','Bocor','Kendor','Kering','Kotor','Rantas','Rompal','Rusak','Suara Kasar','Tindakan Tidak OK','Sedang dalam perbaikan'];
-                                                    $isOtherSelected = !empty($item->condition) && !in_array($item->condition, $predefinedConditions);
-                                                    $otherValues = $isOtherSelected ? array_map('trim', explode(',', $item->condition)) : [''];
-                                                    $otherValues = array_filter($otherValues, fn($v) => $v !== '');
-                                                    if (empty($otherValues)) $otherValues = [''];
-                                                    $otherValues = array_values($otherValues);
+                                                    // Pecah simpanan lama (comma-separated) jadi pilihan baku + custom manual
+                                                    $storedParts = !empty($item->condition) ? array_map('trim', explode(',', $item->condition)) : [];
+                                                    $storedParts = array_values(array_filter($storedParts, fn($v) => $v !== '' && $v !== 'Other' && $v !== 'Tulis Kondisinya'));
+                                                    $selectedPredefined = array_values(array_filter($storedParts, fn($v) => in_array($v, $predefinedConditions)));
+                                                    $customValues = array_values(array_filter($storedParts, fn($v) => !in_array($v, $predefinedConditions)));
+                                                    $isOtherSelected = !empty($customValues) || (!empty($item->condition) && str_contains($item->condition, 'Other'));
+                                                    $otherValues = !empty($customValues) ? $customValues : [''];
                                                 @endphp
-                                                <select name="items[{{ $item->id }}][condition]"
+                                                <select name="items[{{ $item->id }}][condition][]"
+                                                        multiple="multiple"
                                                         class="form-select condition-select select2-searchable"
                                                         id="condition-{{ $item->id }}"
-                                                        data-item-id="{{ $item->id }}">
-                                                    <option value="" {{ empty($item->condition) ? 'selected' : '' }}>-- Pilih Hasil --</option>
+                                                        data-item-id="{{ $item->id }}"
+                                                        data-placeholder="-- Pilih Hasil (bisa >1) --">
 
                                                     <optgroup label="Kondisi Normal">
-                                                        <option value="Berfungsi" {{ $item->condition == 'Berfungsi' ? 'selected' : '' }}>Berfungsi</option>
-                                                        <option value="Normal" {{ $item->condition == 'Normal' ? 'selected' : '' }}>Normal</option>
-                                                        <option value="Bersih" {{ $item->condition == 'Bersih' ? 'selected' : '' }}>Bersih</option>
-                                                        <option value="Tekanan OK" {{ $item->condition == 'Tekanan OK' ? 'selected' : '' }}>Tekanan OK</option>
+                                                        <option value="Berfungsi" {{ in_array('Berfungsi', $selectedPredefined) ? 'selected' : '' }}>Berfungsi</option>
+                                                        <option value="Normal" {{ in_array('Normal', $selectedPredefined) ? 'selected' : '' }}>Normal</option>
+                                                        <option value="Bersih" {{ in_array('Bersih', $selectedPredefined) ? 'selected' : '' }}>Bersih</option>
+                                                        <option value="Tekanan OK" {{ in_array('Tekanan OK', $selectedPredefined) ? 'selected' : '' }}>Tekanan OK</option>
                                                     </optgroup>
 
                                                     <optgroup label="Temuan Masalah">
-                                                        <option value="Aus" {{ $item->condition == 'Aus' ? 'selected' : '' }}>Aus</option>
-                                                        <option value="Bergetar" {{ $item->condition == 'Bergetar' ? 'selected' : '' }}>Bergetar</option>
-                                                        <option value="Bocor" {{ $item->condition == 'Bocor' ? 'selected' : '' }}>Bocor</option>
-                                                        <option value="Kendor" {{ $item->condition == 'Kendor' ? 'selected' : '' }}>Kendor</option>
-                                                        <option value="Kering" {{ $item->condition == 'Kering' ? 'selected' : '' }}>Kering</option>
-                                                        <option value="Kotor" {{ $item->condition == 'Kotor' ? 'selected' : '' }}>Kotor</option>
-                                                        <option value="Rantas" {{ $item->condition == 'Rantas' ? 'selected' : '' }}>Rantas</option>
-                                                        <option value="Rompal" {{ $item->condition == 'Rompal' ? 'selected' : '' }}>Rompal</option>
-                                                        <option value="Rusak" {{ $item->condition == 'Rusak' ? 'selected' : '' }}>Rusak</option>
-                                                        <option value="Suara Kasar" {{ $item->condition == 'Suara Kasar' ? 'selected' : '' }}>Suara Kasar</option>
-                                                        <option value="Tindakan Tidak OK" {{ $item->condition == 'Tindakan Tidak OK' ? 'selected' : '' }}>Tindakan Tidak OK</option>
-                                                        <option value="Sedang dalam perbaikan" {{ $item->condition == 'Sedang dalam perbaikan' ? 'selected' : '' }}>Sedang dalam perbaikan</option>
+                                                        <option value="Aus" {{ in_array('Aus', $selectedPredefined) ? 'selected' : '' }}>Aus</option>
+                                                        <option value="Bergetar" {{ in_array('Bergetar', $selectedPredefined) ? 'selected' : '' }}>Bergetar</option>
+                                                        <option value="Bocor" {{ in_array('Bocor', $selectedPredefined) ? 'selected' : '' }}>Bocor</option>
+                                                        <option value="Kendor" {{ in_array('Kendor', $selectedPredefined) ? 'selected' : '' }}>Kendor</option>
+                                                        <option value="Kering" {{ in_array('Kering', $selectedPredefined) ? 'selected' : '' }}>Kering</option>
+                                                        <option value="Kotor" {{ in_array('Kotor', $selectedPredefined) ? 'selected' : '' }}>Kotor</option>
+                                                        <option value="Rantas" {{ in_array('Rantas', $selectedPredefined) ? 'selected' : '' }}>Rantas</option>
+                                                        <option value="Rompal" {{ in_array('Rompal', $selectedPredefined) ? 'selected' : '' }}>Rompal</option>
+                                                        <option value="Rusak" {{ in_array('Rusak', $selectedPredefined) ? 'selected' : '' }}>Rusak</option>
+                                                        <option value="Suara Kasar" {{ in_array('Suara Kasar', $selectedPredefined) ? 'selected' : '' }}>Suara Kasar</option>
+                                                        <option value="Tindakan Tidak OK" {{ in_array('Tindakan Tidak OK', $selectedPredefined) ? 'selected' : '' }}>Tindakan Tidak OK</option>
+                                                        <option value="Sedang dalam perbaikan" {{ in_array('Sedang dalam perbaikan', $selectedPredefined) ? 'selected' : '' }}>Sedang dalam perbaikan</option>
                                                     </optgroup>
 
-                                                    <option value="Other" {{ $isOtherSelected || $item->condition == 'Other' ? 'selected' : '' }}>Other (Lainnya)...</option>
+                                                    <option value="Other" {{ $isOtherSelected ? 'selected' : '' }}>Other</option>
                                                 </select>
+                                                <small class="text-muted d-block mt-1" style="font-size:0.7rem;"><i class="fas fa-info-circle me-1"></i>Bisa pilih lebih dari 1. Centang "Other" untuk tambah tulisan manual.</small>
 
-                                                {{-- Input manual dinamis untuk pilihan Other --}}
+                                                {{-- Input manual dinamis untuk pilihan Other (bisa digabung dengan pilihan di atas) --}}
                                                 <div class="other-input-wrapper mt-2 p-2 border rounded bg-light" id="other-wrapper-{{ $item->id }}" style="{{ $isOtherSelected ? '' : 'display:none;' }}">
-                                                    <label class="form-label fw-bold small mb-1">
-                                                        <i class="fas fa-pen me-1"></i>Tulis Hasil Manual:
-                                                    </label>
+                                                    
                                                     <div class="other-inputs-list" id="other-list-{{ $item->id }}">
                                                         @foreach($otherValues as $otherVal)
                                                         <div class="input-group input-group-sm mb-1 other-input-row">
@@ -686,9 +706,19 @@
                                                     </button>
                                                 </div>
                                             @else
-                                                <span class="badge {{ in_array($item->condition, ['Normal', 'Berfungsi', 'Bersih', 'Tekanan OK']) ? 'bg-success' : 'bg-secondary' }} text-white">
-                                                    {{ $item->condition ?? 'Belum Dicek' }}
-                                                </span>
+                                                @php
+                                                    $readParts = !empty($item->condition) ? array_map('trim', explode(',', $item->condition)) : [];
+                                                    $readParts = array_values(array_filter($readParts, fn($v) => $v !== ''));
+                                                @endphp
+                                                @if(empty($readParts))
+                                                    <span class="badge bg-secondary text-white">Belum Dicek</span>
+                                                @else
+                                                    @foreach($readParts as $part)
+                                                        <span class="badge {{ in_array($part, ['Normal', 'Berfungsi', 'Bersih', 'Tekanan OK']) ? 'bg-success' : 'bg-secondary' }} text-white me-1 mb-1" style="display:inline-block;">
+                                                            {{ $part }}
+                                                        </span>
+                                                    @endforeach
+                                                @endif
                                             @endif
                                         </td>
 
@@ -849,44 +879,74 @@
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
 $(document).ready(function() {
-    // ========== 1. Select2 Initialization ==========
-    $('.select2-searchable').select2({
-        theme: 'bootstrap-5',
-        placeholder: '-- Pilih Hasil --',
-        allowClear: false,
-        width: '100%',
-        dropdownParent: $('body'),
-        language: {
-            noResults: function() {
-                return "Tidak ditemukan";
-            },
-            searching: function() {
-                return "Mencari...";
+    // ========== 1. Select2 Initialization (multi-pilih hasil) ==========
+    $('.select2-searchable').each(function() {
+        const ph = $(this).data('placeholder') || '-- Pilih Hasil (bisa >1) --';
+        $(this).select2({
+            theme: 'bootstrap-5',
+            placeholder: ph,
+            allowClear: true,
+            width: '100%',
+            closeOnSelect: false,
+            dropdownParent: $('body'),
+            language: {
+                noResults: function() {
+                    return "Tidak ditemukan";
+                },
+                searching: function() {
+                    return "Mencari...";
+                }
             }
-        }
+        });
     });
 
-    // ========== 1b. Other (manual input dinamis) ==========
-    function toggleOtherWrapper(itemId) {
-        const val = $('#condition-' + itemId).val();
+    // ========== 1b. Other (manual input dinamis, bisa gabung dgn pilihan) ==========
+    function toggleOtherWrapper(itemId, focusManual) {
+        let val = $('#condition-' + itemId).val();
+        if (val === null || val === undefined) val = [];
+        if (!Array.isArray(val)) val = [val];
         const wrapper = $('#other-wrapper-' + itemId);
-        if (val === 'Other') {
-            wrapper.slideDown(150);
+        // Tampilkan jika 'Other' dicentang; tetap tampil jika sudah ada isi manual lama
+        const hasManual = $('#other-list-' + itemId + ' .other-manual-input').filter(function() { return $(this).val().trim() !== ''; }).length > 0;
+        if (val.includes('Other') || hasManual) {
+            wrapper.stop(true, true).slideDown(150, function() {
+                if (focusManual) {
+                    const target = $('#other-list-' + itemId + ' .other-manual-input').filter(function() { return $(this).val().trim() === ''; }).first();
+                    (target.length ? target : $('#other-list-' + itemId + ' .other-manual-input').last()).focus();
+                }
+            });
         } else {
-            wrapper.slideUp(150);
+            wrapper.stop(true, true).slideUp(150);
         }
     }
 
     // Init saat load (untuk data custom lama)
     $('.condition-select').each(function() {
         const itemId = $(this).data('item-id') || $(this).attr('id').split('-')[1];
-        toggleOtherWrapper(itemId);
+        toggleOtherWrapper(itemId, false);
     });
 
-    // Saat dropdown berubah
+    // Saat dropdown berubah (change biasa)
     $(document).on('change', '.condition-select', function() {
         const itemId = $(this).data('item-id') || $(this).attr('id').split('-')[1];
-        toggleOtherWrapper(itemId);
+        toggleOtherWrapper(itemId, false);
+    });
+
+    // Saat pilih via Select2: kalau yang dipilih "Other", langsung tutup dropdown
+    // supaya input manual di bawahnya tidak tertutup dropdown dan langsung bisa diketik.
+    $(document).on('select2:select', '.condition-select', function(e) {
+        const itemId = $(this).data('item-id') || $(this).attr('id').split('-')[1];
+        if (e.params && e.params.data && e.params.data.id === 'Other') {
+            $(this).select2('close');
+            toggleOtherWrapper(itemId, true);
+        } else {
+            toggleOtherWrapper(itemId, false);
+        }
+    });
+
+    $(document).on('select2:unselect', '.condition-select', function() {
+        const itemId = $(this).data('item-id') || $(this).attr('id').split('-')[1];
+        toggleOtherWrapper(itemId, false);
     });
 
     // Tambah input manual baru
@@ -1026,7 +1086,7 @@ $(document).ready(function() {
     });
 });
 
-// ========== 10. Validation Logic ==========
+// ========== 10. Validation Logic (multi-pilih + Other) ==========
 function validateBeforeComplete() {
     const conditions = document.querySelectorAll('.condition-select');
     let allFilled = true;
@@ -1034,19 +1094,30 @@ function validateBeforeComplete() {
     let otherEmptyItems = [];
 
     conditions.forEach((select, index) => {
-        const value = $(select).val();
-        if (value === "" || value === null) {
+        let value = $(select).val();
+        if (value === null || value === undefined) value = [];
+        if (!Array.isArray(value)) value = [value];
+        value = value.filter(v => v !== '' && v !== null);
+
+        const itemId = $(select).data('item-id') || $(select).attr('id').split('-')[1];
+        const manualFilled = $('#other-list-' + itemId + ' .other-manual-input')
+            .map(function() { return $(this).val().trim(); }).get()
+            .filter(v => v !== '');
+
+        const hasPredefined = value.filter(v => v !== 'Other').length > 0;
+        const hasOtherFlag = value.includes('Other');
+
+        if (hasOtherFlag && manualFilled.length === 0 && !hasPredefined) {
+            // Hanya pilih Other tapi manual kosong
+            allFilled = false;
+            otherEmptyItems.push(index + 1);
+        } else if (hasOtherFlag && manualFilled.length === 0 && hasPredefined) {
+            // Punya pilihan baku + flag Other kosong -> tetap lolos? tidak, ingatkan isi manual atau hapus Other
+            allFilled = false;
+            otherEmptyItems.push(index + 1);
+        } else if (!hasPredefined && manualFilled.length === 0) {
             allFilled = false;
             emptyItems.push(index + 1);
-        } else if (value === 'Other') {
-            const itemId = $(select).data('item-id') || $(select).attr('id').split('-')[1];
-            const filled = $('#other-list-' + itemId + ' .other-manual-input')
-                .map(function() { return $(this).val().trim(); }).get()
-                .filter(v => v !== '');
-            if (filled.length === 0) {
-                allFilled = false;
-                otherEmptyItems.push(index + 1);
-            }
         }
     });
 
